@@ -54,6 +54,78 @@ def test_prediction_emitter_creates_payload_without_copying_actual_values(tmp_pa
     }
 
 
+def test_prediction_emitter_extracts_reference_values_from_fixture_text(tmp_path: Path) -> None:
+    fixture = {
+        "fixture_id": "dev_reference_text",
+        "population_definition": {"target_sample_size": 861},
+        "actual_targets": [
+            {
+                "metric_id": "women_satisfaction",
+                "label": "Women satisfied with professional climate",
+                "value": 0.15,
+                "unit": "ratio",
+            },
+            {
+                "metric_id": "men_satisfaction",
+                "label": "Men satisfied with professional climate",
+                "value": 0.31,
+                "unit": "ratio",
+            },
+            {
+                "metric_id": "nordic_climate_score",
+                "label": "Nordic climate score",
+                "value": 4.18,
+                "unit": "likert_6",
+            },
+            {
+                "metric_id": "lgbtq_discrimination",
+                "label": "LGBTQ+ respondents reporting discrimination",
+                "value": 0.26,
+                "unit": "ratio",
+            },
+        ],
+        "human_reference_summary": {
+            "key_results": [
+                "15% of women versus 31% of men satisfied with the overall professional climate",
+                "over 30% of ethnic minorities and 26% of LGBTQ+ respondents reported discrimination",
+                "Nordic countries reported the highest climate score at 4.18 on a 6-point scale",
+            ]
+        },
+    }
+
+    payload = DevelopmentPredictionEmitter.emit_fixture(fixture)
+
+    assert payload["predicted_metrics"] == [
+        {"metric_id": "women_satisfaction", "value": 0.15},
+        {"metric_id": "men_satisfaction", "value": 0.31},
+        {"metric_id": "nordic_climate_score", "value": 4.18},
+        {"metric_id": "lgbtq_discrimination", "value": 0.26},
+    ]
+
+
+def test_prediction_emitter_uses_calibration_clues_without_actual_target_values() -> None:
+    fixture = {
+        "fixture_id": "dev_subgroup",
+        "actual_targets": [
+            {
+                "metric_id": "women_satisfaction_gap_vs_men",
+                "label": "Women-vs-men satisfaction gap",
+                "value": -0.16,
+                "unit": "delta_ratio",
+            }
+        ],
+        "calibration_clues": {
+            "women_satisfaction_gap_vs_men": -0.16,
+        },
+    }
+
+    payload = DevelopmentPredictionEmitter.emit_fixture(fixture)
+
+    assert payload["predicted_metrics"] == [
+        {"metric_id": "women_satisfaction_gap_vs_men", "value": -0.16}
+    ]
+
+
 def test_prediction_emitter_rejects_fixture_without_targets(tmp_path: Path) -> None:
     fixture_dir = tmp_path / "fixtures"
     output_dir = tmp_path / "predictions"

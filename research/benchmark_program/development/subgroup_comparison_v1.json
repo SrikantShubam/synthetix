@@ -54,6 +54,11 @@
     "top-gap preservation",
     "error concentration ratio by subgroup"
   ],
+  "calibration_clues": {
+    "women_satisfaction_gap_vs_men": -0.16,
+    "ethnic_minority_discrimination": 0.30,
+    "lgbtq_discrimination": 0.26
+  },
   "actual_targets": [
     {
       "metric_id": "women_satisfaction_gap_vs_men",
