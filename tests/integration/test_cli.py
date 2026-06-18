@@ -319,3 +319,42 @@ def test_cli_quality_loop_run_reports_next_task(tmp_path: Path) -> None:
     assert result.exit_code == 0
     assert "improve-predicted-metrics" in result.stdout
     assert (tmp_path / "docs/progress/quality-loop-progress.md").exists()
+
+
+def test_cli_frozen_validation_workflow_generates_quality_summary(
+    tmp_path: Path, monkeypatch: MonkeyPatch
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    runner = CliRunner()
+    (tmp_path / "research/source_of_truth").mkdir(parents=True)
+    (tmp_path / "research/source_of_truth/manifest.json").write_text(
+        '{"policy":{"forbidden_uses":["training","prompt_tuning"]}}',
+        encoding="utf-8",
+    )
+    fixture_dir = tmp_path / "research/benchmark_program/validation"
+    fixture_dir.mkdir(parents=True)
+    (fixture_dir / "fixture.json").write_text(
+        """
+{
+  "fixture_id": "validation_fixture",
+  "population_definition": {"target_sample_size": 12},
+  "actual_targets": [
+    {"metric_id": "overall_sample_size", "label": "Sample size", "value": 12.0, "tolerance": 0.0, "unit": "count"}
+  ]
+}
+""".strip(),
+        encoding="utf-8",
+    )
+
+    freeze = runner.invoke(app, ["benchmark-freeze", "validation"])
+    assert freeze.exit_code == 0
+    assert "freeze-manifest.json" in freeze.stdout
+
+    predict = runner.invoke(app, ["benchmark-predict-frozen", "validation"])
+    assert predict.exit_code == 0
+    assert "fixture_count" in predict.stdout
+
+    evaluate = runner.invoke(app, ["benchmark-evaluate-frozen", "validation"])
+    assert evaluate.exit_code == 0
+    assert "quality_status" in evaluate.stdout
+    assert (tmp_path / "data/frozen-evaluations/validation/quality-summary.json").exists()

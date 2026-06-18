@@ -7,6 +7,7 @@ from pathlib import Path
 import typer
 
 from synthetix.application import RunService
+from synthetix.benchmarking.frozen import EvaluationSplit, FrozenEvaluation
 from synthetix.benchmarking.loop import BenchmarkLoop
 from synthetix.benchmarking.predictions import DevelopmentPredictionEmitter
 from synthetix.benchmarking.runtime import BenchmarkComparator
@@ -207,6 +208,75 @@ def benchmark_predict_development(
         output_dir=output_dir,
     )
     typer.echo(json.dumps(summary, indent=2))
+
+
+@app.command("benchmark-freeze")
+def benchmark_freeze(
+    split: EvaluationSplit = typer.Argument(..., help="Evaluation split to freeze: validation or holdout."),
+    output: Path | None = typer.Option(
+        None,
+        "--output",
+        help="Path to write the immutable freeze manifest.",
+    ),
+) -> None:
+    """Freeze validation or holdout artifacts before one-shot evaluation."""
+    evaluator = FrozenEvaluation.for_workspace(Path.cwd())
+    output_path = output or Path(f"data/frozen-evaluations/{split}/freeze-manifest.json")
+    manifest = evaluator.freeze(split=split, output_path=output_path)
+    typer.echo(manifest.model_dump_json(indent=2))
+
+
+@app.command("benchmark-predict-frozen")
+def benchmark_predict_frozen(
+    split: EvaluationSplit = typer.Argument(..., help="Frozen split to predict: validation or holdout."),
+    output_dir: Path | None = typer.Option(
+        None,
+        "--output-dir",
+        help="Directory where predicted metric payloads are written.",
+    ),
+) -> None:
+    """Emit predictions for a frozen validation or holdout split."""
+    evaluator = FrozenEvaluation.for_workspace(Path.cwd())
+    prediction_dir = output_dir or Path(f"data/benchmark-predictions/{split}")
+    summary = evaluator.emit_predictions(split=split, output_dir=prediction_dir)
+    typer.echo(json.dumps(summary, indent=2))
+
+
+@app.command("benchmark-evaluate-frozen")
+def benchmark_evaluate_frozen(
+    split: EvaluationSplit = typer.Argument(..., help="Frozen split to evaluate: validation or holdout."),
+    predicted_dir: Path | None = typer.Option(
+        None,
+        "--predicted-dir",
+        help="Directory containing predicted metric payloads.",
+    ),
+    output_dir: Path | None = typer.Option(
+        None,
+        "--output-dir",
+        help="Directory where comparison reports and summary.json are written.",
+    ),
+    quality_output: Path | None = typer.Option(
+        None,
+        "--quality-output",
+        help="Path to write the frozen quality summary.",
+    ),
+    min_average_score: float = typer.Option(0.8, "--min-average-score"),
+    min_fixture_score: float = typer.Option(0.7, "--min-fixture-score"),
+) -> None:
+    """Compare frozen predictions and write an honest quality-gate summary."""
+    evaluator = FrozenEvaluation.for_workspace(Path.cwd())
+    prediction_dir = predicted_dir or Path(f"data/benchmark-predictions/{split}")
+    comparison_dir = output_dir or Path(f"data/benchmark-results/{split}")
+    quality_path = quality_output or Path(f"data/frozen-evaluations/{split}/quality-summary.json")
+    quality = evaluator.evaluate(
+        split=split,
+        predicted_dir=prediction_dir,
+        output_dir=comparison_dir,
+        quality_output=quality_path,
+        min_average_score=min_average_score,
+        min_fixture_score=min_fixture_score,
+    )
+    typer.echo(quality.model_dump_json(indent=2))
 
 
 @app.command("orchestrator-next")
