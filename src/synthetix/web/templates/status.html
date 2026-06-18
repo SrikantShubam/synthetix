@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Run status · Synthetix{% endblock %}
+{% block content %}
+<p class="eyebrow">Run status</p>
+<h1 id="run-status">{{ progress.status }}</h1>
+<div id="progress" data-run-id="{{ run_id }}">
+  <progress max="{{ progress.total or 1 }}" value="{{ progress.completed or 0 }}"></progress>
+  <p><span id="completed">{{ progress.completed or 0 }}</span> / <span id="total">{{ progress.total or "—" }}</span></p>
+</div>
+<p>Cost consumed: $<span id="cost">{{ progress.cost_usd or 0 }}</span></p>
+{% if run_id != "demo" %}
+<form action="/runs/{{ run_id }}/cancel" method="post"><button class="secondary" type="submit">Cancel run</button></form>
+{% else %}
+<a class="button" href="/runs/demo/results">View results</a>
+{% endif %}
+{% endblock %}
+

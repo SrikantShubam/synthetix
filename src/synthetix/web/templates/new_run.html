@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}New run · Synthetix{% endblock %}
+{% block content %}
+<section>
+  <p class="eyebrow">New run</p>
+  <h1>Ingest a survey blueprint</h1>
+  <p>Upload strict JSON/YAML or a PDF, Markdown, or text questionnaire. Documents are parsed through OpenRouter only after confirmation.</p>
+  <form action="/ingest" method="post" enctype="multipart/form-data">
+    <label>Survey file<input type="file" name="file" accept=".json,.yaml,.yml,.pdf,.md,.txt" required></label>
+    <label class="check"><input type="checkbox" name="confirm_transmission" value="true"> I approve external transmission for document parsing.</label>
+    <button type="submit">Validate input</button>
+  </form>
+</section>
+<aside class="warning"><strong>Research boundary</strong><br>Synthetic personas do not estimate real population behavior, prevalence, causality, or statistical significance.</aside>
+{% endblock %}
+

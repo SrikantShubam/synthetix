@@ -1,0 +1,19 @@
+{
+  "version": "1.0",
+  "data_partition": "validation",
+  "policy": {
+    "purpose": "release gate before holdout",
+    "must_not_reuse_development_targets": true,
+    "must_not_reference_holdout_paths": true
+  },
+  "fixtures": [
+    {
+      "fixture_id": "val_registry_access_policy_v1",
+      "path": "research/benchmark_program/validation/registry_access_policy_v1.json"
+    },
+    {
+      "fixture_id": "val_professional_survey_metadata_v1",
+      "path": "research/benchmark_program/validation/professional_survey_metadata_v1.json"
+    }
+  ]
+}

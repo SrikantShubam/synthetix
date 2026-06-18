@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}Review · Synthetix{% endblock %}
+{% block content %}
+<p class="eyebrow">Validation complete</p>
+<h1>Review parsed questions</h1>
+<dl>
+  <dt>Title</dt><dd>{{ blueprint.title }}</dd>
+  <dt>Population</dt><dd>{{ blueprint.population.size }} synthetic personas</dd>
+  <dt>Model profile</dt><dd>{{ blueprint.model.profile }}</dd>
+</dl>
+<ol>{% for question in blueprint.questions %}<li><strong>{{ question.id }}</strong> {{ question.prompt }}</li>{% endfor %}</ol>
+<a class="button" href="/runs/{{ run_id }}/preflight">Continue to preflight</a>
+{% endblock %}
+

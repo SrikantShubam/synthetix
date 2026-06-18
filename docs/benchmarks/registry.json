@@ -1,0 +1,49 @@
+{
+  "version": "1.0",
+  "entries": [
+    {
+      "benchmark_id": "food_and_you_2",
+      "display_name": "Food and You 2",
+      "steward": "UK Food Standards Agency",
+      "access_tier": "registration_required",
+      "download_permitted": false,
+      "restricted_data": true,
+      "source_url": "https://www.food.gov.uk/research/food-and-you/food-and-you-2",
+      "citation": "Food Standards Agency, Food and You 2.",
+      "notes": "Registry metadata only. Do not auto-download or mirror restricted microdata."
+    },
+    {
+      "benchmark_id": "stack_overflow_survey",
+      "display_name": "Stack Overflow Developer Survey",
+      "steward": "Stack Overflow",
+      "access_tier": "public",
+      "download_permitted": false,
+      "restricted_data": false,
+      "source_url": "https://survey.stackoverflow.co/",
+      "citation": "Stack Overflow Developer Survey.",
+      "notes": "Use public methodology and aggregate documentation only unless explicit download handling is added elsewhere."
+    },
+    {
+      "benchmark_id": "ess",
+      "display_name": "European Social Survey",
+      "steward": "European Social Survey ERIC",
+      "access_tier": "registration_required",
+      "download_permitted": false,
+      "restricted_data": true,
+      "source_url": "https://www.europeansocialsurvey.org/",
+      "citation": "European Social Survey (ESS) ERIC.",
+      "notes": "Registry metadata only. Access is controlled and should remain outside offline tests."
+    },
+    {
+      "benchmark_id": "wvs",
+      "display_name": "World Values Survey",
+      "steward": "World Values Survey Association",
+      "access_tier": "registration_required",
+      "download_permitted": false,
+      "restricted_data": true,
+      "source_url": "https://www.worldvaluessurvey.org/",
+      "citation": "World Values Survey Association, World Values Survey.",
+      "notes": "Registry metadata only. Do not fetch controlled files from this registry."
+    }
+  ]
+}

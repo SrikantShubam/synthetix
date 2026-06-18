@@ -1,0 +1,59 @@
+{
+  "fixture_id": "val_professional_survey_metadata_v1",
+  "data_partition": "validation",
+  "evaluation_only": true,
+  "training_allowed": false,
+  "source_strategy": "derive validation targets from non-holdout professional survey benchmark registry metadata",
+  "source_documents": [
+    "docs/benchmarks/registry.json"
+  ],
+  "forbidden_source_refs": [
+    "research/source_of_truth/holdout_papers",
+    "research/benchmark_program/development"
+  ],
+  "population_definition": {
+    "target_population": "registered survey benchmarks relevant to professional and public survey analysis",
+    "sample_design": "metadata-only validation fixture",
+    "target_sample_size": 4,
+    "unit_of_analysis": "survey benchmark registry entry",
+    "notes": "Used to validate that the platform can separate public, restricted, and registration-required sources."
+  },
+  "questionnaire_or_task": {
+    "task_type": "survey_source_readiness_validation",
+    "question_types": [
+      "categorical",
+      "binary"
+    ],
+    "example_constructs": [
+      "survey benchmark availability",
+      "source governance",
+      "restricted data handling"
+    ]
+  },
+  "segment_variables": [
+    "steward",
+    "access_tier",
+    "restricted_data"
+  ],
+  "comparison_metric": [
+    "count error",
+    "restricted-source handling"
+  ],
+  "actual_targets": [
+    {
+      "metric_id": "download_permitted_entries",
+      "label": "Download-permitted registry entries",
+      "value": 0.0,
+      "tolerance": 0.0,
+      "unit": "count"
+    },
+    {
+      "metric_id": "registration_required_entries",
+      "label": "Registration-required registry entries",
+      "value": 3.0,
+      "tolerance": 0.0,
+      "unit": "count"
+    }
+  ],
+  "instance_status": "authoring_complete"
+}

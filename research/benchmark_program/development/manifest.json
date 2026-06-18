@@ -1,0 +1,41 @@
+{
+  "version": "1.0",
+  "data_partition": "development",
+  "policy": {
+    "purpose": "controlled iteration without contaminating holdout",
+    "must_not_reuse_holdout_targets": true,
+    "must_not_reference_paths": [
+      "research/source_of_truth/holdout_papers/ai_persona",
+      "research/source_of_truth/holdout_papers/survey_benchmarks"
+    ]
+  },
+  "development_sources": [
+    "research/benchmark_program/development/sources/2602.18462_assessing_reliability_persona_conditioned_llms.pdf",
+    "research/benchmark_program/development/sources/2512.02058_misalignment_low_resource_settings.pdf",
+    "research/benchmark_program/development/sources/2601.22396_culturally_grounded_personas_wvs_alignment.pdf",
+    "research/benchmark_program/development/sources/2508.04302_eea_professional_climate_survey_report.pdf",
+    "research/benchmark_program/development/sources/2503.19238_unveiling_ruby_stackoverflow_developer_survey.pdf"
+  ],
+  "fixtures": [
+    {
+      "fixture_id": "dev_privacy_decision_replication_v1",
+      "path": "research/benchmark_program/development/privacy_decision_replication_v1.json"
+    },
+    {
+      "fixture_id": "dev_consumer_choice_distribution_v1",
+      "path": "research/benchmark_program/development/consumer_choice_distribution_v1.json"
+    },
+    {
+      "fixture_id": "dev_attitudes_values_survey_v1",
+      "path": "research/benchmark_program/development/attitudes_values_survey_v1.json"
+    },
+    {
+      "fixture_id": "dev_binary_opentext_mixed_v1",
+      "path": "research/benchmark_program/development/binary_opentext_mixed_v1.json"
+    },
+    {
+      "fixture_id": "dev_subgroup_comparison_v1",
+      "path": "research/benchmark_program/development/subgroup_comparison_v1.json"
+    }
+  ]
+}

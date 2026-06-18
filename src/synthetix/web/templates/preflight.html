@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}Preflight · Synthetix{% endblock %}
+{% block content %}
+<p class="eyebrow">Preflight</p>
+<h1>Review resource ceiling</h1>
+<div class="metrics">
+  <div><span>Projected calls</span><strong>{{ estimate.projected_calls }}</strong></div>
+  <div><span>Worst-case tokens</span><strong>{{ estimate.max_tokens }}</strong></div>
+  <div><span>Worst-case cost</span><strong>${{ "%.4f"|format(estimate.max_cost_usd) }}</strong></div>
+</div>
+<ul>{% for warning in estimate.warnings %}<li>{{ warning }}</li>{% endfor %}</ul>
+{% if run_id != "demo" %}
+<form action="/runs/{{ run_id }}/approve" method="post"><button type="submit">Approve and run</button></form>
+{% endif %}
+{% endblock %}
+

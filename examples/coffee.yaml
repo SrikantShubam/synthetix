@@ -1,0 +1,31 @@
+schema_version: "1.0"
+title: Premium coffee subscription
+purpose: Explore scenario reactions to a monthly premium coffee subscription.
+population:
+  size: 8
+  seed: 42
+  attributes:
+    region: [urban, suburban]
+    budget_style: [price-sensitive, quality-focused]
+  psychographics:
+    - skeptical of recurring subscriptions
+    - values convenience
+model:
+  profile: openrouter-default
+  temperature: 0.2
+  max_output_tokens: 500
+questions:
+  - type: choice
+    id: subscribe
+    prompt: Would this persona consider subscribing?
+    options: ["yes", "no"]
+  - type: likert
+    id: value
+    prompt: How compelling is the value proposition?
+    minimum: 1
+    maximum: 5
+  - type: open_text
+    id: rationale
+    prompt: Explain the primary reason for the reaction.
+limitations:
+  - This concept test has not been calibrated against human reference data.

@@ -1,0 +1,103 @@
+{
+  "fixture_id": "dev_consumer_choice_distribution_v1",
+  "data_partition": "development",
+  "evaluation_only": false,
+  "training_allowed": true,
+  "source_strategy": "use a non-holdout consumer-choice study with binary, categorical, and count-like outcomes",
+  "source_documents": [
+    "research/benchmark_program/development/sources/2601.22396_culturally_grounded_personas_wvs_alignment.pdf",
+    "research/benchmark_program/development/sources/2508.04302_eea_professional_climate_survey_report.pdf"
+  ],
+  "forbidden_source_refs": [
+    "research/source_of_truth/holdout_papers/ai_persona/2606.09013_beyond_averages_distributional_replication.pdf"
+  ],
+  "population_definition": {
+    "target_population": "professionals or respondents making repeated categorical choices and reporting subgroup-specific climate or preference outcomes",
+    "sample_design": "development-only benchmark assembled from non-holdout survey reports with subgroup tables",
+    "target_sample_size": 861,
+    "unit_of_analysis": "respondent plus subgroup outcome table",
+    "notes": "The purpose is to stress-test distribution and subgroup-gap matching, not just top-line averages."
+  },
+  "questionnaire_or_task": {
+    "task_type": "categorical and subgroup table replication",
+    "question_types": [
+      "binary",
+      "categorical",
+      "count_proxy",
+      "ordinal climate score"
+    ],
+    "example_constructs": [
+      "satisfaction category",
+      "discrimination incidence",
+      "respect perception",
+      "climate score by region"
+    ]
+  },
+  "segment_variables": [
+    "gender",
+    "ethnic_minority_status",
+    "lgbtq_status",
+    "disability_status",
+    "region"
+  ],
+  "reported_findings_template": [
+    "women report lower satisfaction than men",
+    "minority groups report higher discrimination and exclusion",
+    "regional climate scores differ materially across Europe",
+    "subgroup gaps widen on respect, harassment, and inclusion outcomes"
+  ],
+  "comparison_metric": [
+    "mean absolute error",
+    "total variation distance",
+    "distributional calibration gap",
+    "largest subgroup gap preservation"
+  ],
+  "actual_targets": [
+    {
+      "metric_id": "women_satisfaction",
+      "label": "Women satisfied with professional climate",
+      "value": 0.15,
+      "tolerance": 0.05,
+      "unit": "ratio"
+    },
+    {
+      "metric_id": "men_satisfaction",
+      "label": "Men satisfied with professional climate",
+      "value": 0.31,
+      "tolerance": 0.05,
+      "unit": "ratio"
+    },
+    {
+      "metric_id": "ethnic_minority_discrimination",
+      "label": "Ethnic-minority respondents reporting discrimination",
+      "value": 0.30,
+      "tolerance": 0.05,
+      "unit": "ratio"
+    },
+    {
+      "metric_id": "lgbtq_discrimination",
+      "label": "LGBTQ+ respondents reporting discrimination",
+      "value": 0.26,
+      "tolerance": 0.05,
+      "unit": "ratio"
+    },
+    {
+      "metric_id": "nordic_climate_score",
+      "label": "Nordic climate score",
+      "value": 4.18,
+      "tolerance": 0.2,
+      "unit": "likert_6"
+    }
+  ],
+  "human_reference_summary": {
+    "source_paper": "EEA Professional Climate Survey Report",
+    "reported_sample_or_scale": "861 respondents",
+    "key_results": [
+      "46.5% women, 22.6% ethnic minorities, 17.3% LGBTQ+, 25% disability",
+      "15% of women versus 31% of men satisfied with the overall professional climate",
+      "over 30% of ethnic minorities and 26% of LGBTQ+ respondents reported discrimination",
+      "Nordic countries reported the highest climate score at 4.18 on a 6-point scale"
+    ]
+  },
+  "instance_status": "authoring_complete"
+}

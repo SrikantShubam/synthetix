@@ -1,0 +1,65 @@
+{
+  "fixture_id": "val_registry_access_policy_v1",
+  "data_partition": "validation",
+  "evaluation_only": true,
+  "training_allowed": false,
+  "source_strategy": "derive validation targets from docs/benchmarks/registry.json metadata without using holdout papers",
+  "source_documents": [
+    "docs/benchmarks/registry.json"
+  ],
+  "forbidden_source_refs": [
+    "research/source_of_truth/holdout_papers"
+  ],
+  "population_definition": {
+    "target_population": "survey benchmark registry entries used for access-policy validation",
+    "sample_design": "metadata-only validation fixture",
+    "target_sample_size": 4,
+    "unit_of_analysis": "benchmark registry entry",
+    "notes": "This fixture validates restricted/public benchmark handling before holdout."
+  },
+  "questionnaire_or_task": {
+    "task_type": "benchmark_registry_policy_validation",
+    "question_types": [
+      "categorical",
+      "binary"
+    ],
+    "example_constructs": [
+      "restricted data status",
+      "download permission",
+      "public access classification"
+    ]
+  },
+  "segment_variables": [
+    "access_tier",
+    "restricted_data",
+    "download_permitted"
+  ],
+  "comparison_metric": [
+    "count error",
+    "policy classification correctness"
+  ],
+  "actual_targets": [
+    {
+      "metric_id": "registry_entry_count",
+      "label": "Benchmark registry entry count",
+      "value": 4.0,
+      "tolerance": 0.0,
+      "unit": "count"
+    },
+    {
+      "metric_id": "restricted_registry_entries",
+      "label": "Restricted registry entries",
+      "value": 3.0,
+      "tolerance": 0.0,
+      "unit": "count"
+    },
+    {
+      "metric_id": "public_registry_entries",
+      "label": "Public registry entries",
+      "value": 1.0,
+      "tolerance": 0.0,
+      "unit": "count"
+    }
+  ],
+  "instance_status": "authoring_complete"
+}

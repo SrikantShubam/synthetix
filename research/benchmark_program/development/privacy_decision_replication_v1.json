@@ -1,0 +1,90 @@
+{
+  "fixture_id": "dev_privacy_decision_replication_v1",
+  "data_partition": "development",
+  "evaluation_only": false,
+  "training_allowed": true,
+  "source_strategy": "derive a development-only privacy-decision fixture from separate non-holdout survey and persona-reliability papers",
+  "source_documents": [
+    "research/benchmark_program/development/sources/2602.18462_assessing_reliability_persona_conditioned_llms.pdf",
+    "research/benchmark_program/development/sources/2512.02058_misalignment_low_resource_settings.pdf"
+  ],
+  "forbidden_source_refs": [
+    "research/source_of_truth/holdout_papers/ai_persona/2603.19791_text_based_personas_privacy_decisions.pdf"
+  ],
+  "population_definition": {
+    "target_population": "U.S. survey respondents represented through World Values Survey microdata and demographic conditioning stress tests",
+    "sample_design": "development-only benchmark synthesized from non-holdout survey-reliability studies",
+    "target_sample_size": 70000,
+    "unit_of_analysis": "respondent-item instance",
+    "notes": "Based on a non-holdout WVS-backed reliability paper with more than 70K respondent-item instances, plus a Bangladesh low-resource comparison study."
+  },
+  "questionnaire_or_task": {
+    "task_type": "persona-conditioned survey response replication",
+    "question_types": [
+      "binary",
+      "categorical",
+      "open_text"
+    ],
+    "example_constructs": [
+      "value-laden survey agreement items",
+      "persona-conditioned response alignment",
+      "subgroup fidelity under demographic prompting"
+    ]
+  },
+  "segment_variables": [
+    "age_group",
+    "education",
+    "employment_status",
+    "income_level",
+    "religion",
+    "ethnicity"
+  ],
+  "reported_findings_template": [
+    "persona prompting does not yield a clear aggregate improvement",
+    "some items and underrepresented subgroups experience disproportionate distortions",
+    "persona-conditioned outputs can redistribute error across demographic groups",
+    "low-resource persona generation can underperform humans sharply on culturally specific questions"
+  ],
+  "comparison_metric": [
+    "absolute percentage-point error",
+    "distributional distance",
+    "segment rank-order agreement",
+    "human-versus-model accuracy gap",
+    "subgroup fidelity gap"
+  ],
+  "actual_targets": [
+    {
+      "metric_id": "human_accuracy",
+      "label": "Human benchmark accuracy",
+      "value": 0.87,
+      "tolerance": 0.05,
+      "unit": "ratio"
+    },
+    {
+      "metric_id": "best_model_accuracy",
+      "label": "Best reported LLM accuracy",
+      "value": 0.617,
+      "tolerance": 0.05,
+      "unit": "ratio"
+    },
+    {
+      "metric_id": "respondent_item_instances",
+      "label": "Respondent-item evaluation scale",
+      "value": 70000.0,
+      "tolerance": 5000.0,
+      "unit": "count"
+    }
+  ],
+  "human_reference_summary": {
+    "source_paper": "Assessing the Reliability of Persona-Conditioned LLMs as Synthetic Survey Respondents",
+    "secondary_source_paper": "Misalignment of LLM-Generated Personas with Human Perceptions in Low-Resource Settings",
+    "reported_sample_or_scale": "more than 70K respondent-item instances; Bangladesh questionnaire of 100 items with 2080 annotated persona responses",
+    "key_results": [
+      "no clear aggregate improvement from persona prompting",
+      "distortions are heterogeneous across items and subgroups",
+      "human benchmark around 87% accuracy in the Bangladesh study",
+      "best LLM in the Bangladesh study reported around 61.7% accuracy"
+    ]
+  },
+  "instance_status": "authoring_complete"
+}

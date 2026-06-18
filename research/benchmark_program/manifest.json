@@ -1,0 +1,45 @@
+{
+  "version": "1.0",
+  "splits": {
+    "development": {
+      "path": "research/benchmark_program/development",
+      "purpose": "fixture authoring and controlled iteration",
+      "allowed_uses": [
+        "prompt_iteration",
+        "report_design",
+        "analysis_debugging",
+        "ingestion_debugging"
+      ],
+      "forbidden_uses": [
+        "final_generalization_claims"
+      ]
+    },
+    "validation": {
+      "path": "research/benchmark_program/validation",
+      "purpose": "iteration gate before holdout",
+      "allowed_uses": [
+        "candidate_scoring",
+        "release_gate"
+      ],
+      "forbidden_uses": [
+        "example_by_example_manual_overfitting"
+      ]
+    },
+    "holdout": {
+      "path": "research/source_of_truth/holdout_papers",
+      "purpose": "final scorekeeping only",
+      "allowed_uses": [
+        "final_evaluation",
+        "human_vs_ai_comparison"
+      ],
+      "forbidden_uses": [
+        "training",
+        "prompt_tuning",
+        "few_shot_examples",
+        "self_improvement_against_same_holdout",
+        "benchmark_driven_model_selection_on_same_set"
+      ]
+    }
+  },
+  "current_recommendation": "Do not evaluate the main loop on holdout until development and validation fixtures exist."
+}

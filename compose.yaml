@@ -1,0 +1,18 @@
+services:
+  synthetix:
+    build: .
+    ports:
+      - "8000:8000"
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      SYNTHETIX_DATA_DIR: /app/data
+      SYNTHETIX_DATABASE_URL: sqlite+aiosqlite:////app/data/synthetix.db
+    volumes:
+      - synthetix-data:/app/data
+    command: ["synthetix", "serve", "--host", "0.0.0.0", "--port", "8000"]
+
+volumes:
+  synthetix-data:
+

@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% block title %}Results · Synthetix{% endblock %}
+{% block content %}
+<section class="results-hero">
+  <p class="eyebrow">Final report</p>
+  <h1>{{ report.title }}</h1>
+  <p class="results-purpose">{{ report.purpose }}</p>
+  <aside class="warning"><strong>Non-inferential use warning.</strong> Synthetic outputs are scenario evidence, not population estimates, and should not be used to infer prevalence, causality, or statistical significance.</aside>
+  <div class="report-kpis">
+    <div><span>Succeeded</span><strong>{{ report.failures.succeeded }}</strong></div>
+    <div><span>Failed</span><strong>{{ report.failures.failed }}</strong></div>
+    <div><span>Retries</span><strong>{{ report.failures.retries }}</strong></div>
+    <div><span>Cost</span><strong>${{ "%.4f"|format(report.cost_usd) }}</strong></div>
+  </div>
+</section>
+
+<section class="results-grid">
+  <article class="results-panel">
+    <h2>Executive summary</h2>
+    <p>{{ report.executive_summary }}</p>
+  </article>
+
+  <article class="results-panel">
+    <h2>Methodology snapshot</h2>
+    <dl class="inline-definition-list">
+      <dt>Population size</dt>
+      <dd>{{ report.population.size if report.population.size is defined else report.failures.total_personas }}</dd>
+      <dt>Protocol version</dt>
+      <dd>{{ report.provenance.protocol_version }}</dd>
+      <dt>Tokens</dt>
+      <dd>{{ report.token_usage }}</dd>
+      <dt>Generated UTC</dt>
+      <dd>{{ report.generated_at.isoformat() }}</dd>
+    </dl>
+  </article>
+</section>
+
+<section class="results-panel">
+  <div class="results-panel-header">
+    <h2>Question distributions</h2>
+    {% if run_id != "demo" %}<a class="button" href="/runs/{{ run_id }}/report.pdf">Download report.pdf</a>{% endif %}
+  </div>
+  {% for question in report.questions %}
+  <article class="question-summary">
+    <div class="question-summary-header">
+      <div>
+        <p class="section-kicker">{{ question.question_id }}</p>
+        <h3>{{ question.prompt }}</h3>
+      </div>
+      <p class="denominator-chip">Base n = {{ question.response_count }}</p>
+    </div>
+    <table class="data-table">
+      <thead>
+        <tr><th>Response</th><th>Count</th></tr>
+      </thead>
+      <tbody>
+      {% for label in question.distribution.labels %}
+        <tr><td>{{ label }}</td><td>{{ question.distribution.values[loop.index0] }}</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% if question.quotes %}
+    <div class="quote-strip">
+      {% for quote in question.quotes %}
+      <blockquote>{{ quote }}</blockquote>
+      {% endfor %}
+    </div>
+    {% endif %}
+  </article>
+  {% endfor %}
+</section>
+
+<section class="results-grid">
+  <article class="results-panel">
+    <h2>Limitations</h2>
+    <ul class="plain-list">
+      {% for item in report.limitations %}
+      <li>{{ item }}</li>
+      {% endfor %}
+    </ul>
+  </article>
+  <article class="results-panel">
+    <h2>Provenance</h2>
+    <dl class="inline-definition-list">
+      <dt>Model</dt>
+      <dd>{{ report.provenance.model_id }}</dd>
+      <dt>Provider</dt>
+      <dd>{{ report.provenance.provider }}</dd>
+      <dt>Blueprint hash</dt>
+      <dd class="mono">{{ report.provenance.blueprint_hash }}</dd>
+      <dt>Manifest hash</dt>
+      <dd class="mono">{{ report.provenance.manifest_hash }}</dd>
+    </dl>
+  </article>
+</section>
+{% endblock %}

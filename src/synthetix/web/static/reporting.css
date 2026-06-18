@@ -1,0 +1,282 @@
+:root {
+  color-scheme: light;
+  --ink: #16212b;
+  --muted: #5a6873;
+  --line: #d8dee4;
+  --panel: #f6f8fa;
+  --brand: #1f5f78;
+  --brand-soft: #eaf2f5;
+  --warning-border: #b42318;
+  --warning-bg: #fff4f2;
+}
+
+@page {
+  size: A4;
+  margin: 18mm 16mm 18mm;
+  @top-center {
+    content: element(report-header);
+  }
+  @bottom-left {
+    content: element(report-footer);
+  }
+  @bottom-right {
+    content: "Page " counter(page);
+    color: var(--muted);
+    font-size: 9pt;
+  }
+}
+
+body.report-body {
+  margin: 0;
+  color: var(--ink);
+  background: white;
+  font-family: Inter, "Segoe UI", Arial, sans-serif;
+  font-size: 10pt;
+  line-height: 1.5;
+}
+
+.report-running-header {
+  position: running(report-header);
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding-bottom: 4mm;
+  border-bottom: 0.4pt solid var(--line);
+  font-size: 9pt;
+  color: var(--muted);
+}
+
+.running-header-title {
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.report-running-footer {
+  position: running(report-footer);
+  color: var(--muted);
+  font-size: 9pt;
+  border-top: 0.4pt solid var(--line);
+  padding-top: 2mm;
+}
+
+.page-number {
+  display: none;
+}
+
+.report-shell {
+  padding-top: 6mm;
+}
+
+.eyebrow,
+.section-kicker {
+  margin: 0 0 8px;
+  color: var(--brand);
+  font-size: 8.5pt;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+h1,
+h2,
+h3,
+h4,
+p {
+  margin-top: 0;
+}
+
+h1 {
+  font-size: 24pt;
+  line-height: 1.08;
+  margin-bottom: 10px;
+}
+
+h2 {
+  font-size: 15pt;
+  margin-bottom: 10px;
+}
+
+h3 {
+  font-size: 11.5pt;
+  margin-bottom: 6px;
+}
+
+h4 {
+  font-size: 10pt;
+  margin-bottom: 6px;
+}
+
+.report-purpose,
+.summary-card p {
+  font-size: 11pt;
+}
+
+.cover-section,
+.toc-card,
+.report-section,
+.summary-card,
+.finding-card,
+.theme-card,
+.callout-card {
+  break-inside: avoid;
+}
+
+.toc-card,
+.summary-card,
+.finding-card,
+.theme-card,
+.callout-card {
+  border: 0.5pt solid var(--line);
+  border-radius: 6px;
+  background: var(--panel);
+  padding: 14px 16px;
+}
+
+.report-section {
+  margin-top: 20px;
+}
+
+.report-meta-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin: 16px 0;
+}
+
+.report-meta-grid.compact {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.report-meta-grid > div {
+  border: 0.5pt solid var(--line);
+  border-radius: 6px;
+  background: white;
+  padding: 12px;
+}
+
+.report-meta-grid span {
+  display: block;
+  color: var(--muted);
+  font-size: 8.5pt;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.report-meta-grid strong {
+  display: block;
+  margin-top: 6px;
+  font-size: 13pt;
+}
+
+.report-warning {
+  margin: 18px 0;
+  padding: 12px 14px;
+  border-left: 3pt solid var(--warning-border);
+  background: var(--warning-bg);
+}
+
+.toc-card ol,
+.quote-group ul,
+.theme-card ul,
+.callout-card ul,
+#limitations ul {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.toc-card li,
+.quote-group li,
+.theme-card li,
+.callout-card li,
+#limitations li {
+  margin-bottom: 4px;
+}
+
+.toc-card a {
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.finding-list {
+  display: grid;
+  gap: 12px;
+}
+
+.evidence-line {
+  color: var(--muted);
+}
+
+.question-block {
+  margin-bottom: 18px;
+  padding-bottom: 18px;
+  border-bottom: 0.5pt solid var(--line);
+}
+
+.question-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.denominator {
+  min-width: 90px;
+  margin: 0;
+  color: var(--muted);
+  font-size: 9pt;
+}
+
+.chart-figure {
+  margin: 12px 0 14px;
+}
+
+.chart-figure img {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  border: 0.5pt solid var(--line);
+  background: white;
+}
+
+.chart-figure figcaption,
+table caption {
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 8.8pt;
+  text-align: left;
+}
+
+.report-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 12px;
+}
+
+.report-table th,
+.report-table td {
+  padding: 8px 9px;
+  border-bottom: 0.5pt solid var(--line);
+  text-align: left;
+  vertical-align: top;
+}
+
+.report-table thead th {
+  background: var(--brand-soft);
+  font-size: 8.8pt;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.code-block {
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+  font-family: "Cascadia Code", Consolas, monospace;
+  font-size: 8.4pt;
+  background: #fbfcfd;
+  border: 0.5pt solid var(--line);
+  padding: 14px;
+}
+
+.page-break {
+  break-before: page;
+}

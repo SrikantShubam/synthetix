@@ -1,0 +1,75 @@
+{
+  "version": "1.0",
+  "policy": {
+    "classification": "source_of_truth_holdout",
+    "allowed_uses": [
+      "benchmarking",
+      "evaluation",
+      "human_vs_ai_comparison"
+    ],
+    "forbidden_uses": [
+      "training",
+      "prompt_tuning",
+      "few_shot_examples",
+      "benchmark_driven_model_selection_on_same_set",
+      "self_improvement_against_same_holdout"
+    ],
+    "note": "This is test data. Do not train on it."
+  },
+  "assets": [
+    {
+      "id": "ai_persona_privacy_decisions_2603_19791",
+      "category": "ai_persona_holdout",
+      "role": "primary_positive_benchmark",
+      "path": "research/source_of_truth/holdout_papers/ai_persona/2603.19791_text_based_personas_privacy_decisions.pdf",
+      "title": "Text-Based Personas for Simulating User Privacy Decisions",
+      "reported_signal": "up to 88% predictive accuracy",
+      "evaluation_only": true
+    },
+    {
+      "id": "digital_personas_liss_2605_10659",
+      "category": "ai_persona_holdout",
+      "role": "survey_methodology_benchmark",
+      "path": "research/source_of_truth/holdout_papers/ai_persona/2605.10659_when_can_digital_personas_reliably_approximate_human_survey_findings.pdf",
+      "title": "When Can Digital Personas Reliably Approximate Human Survey Findings?",
+      "reported_signal": "distributional alignment improves in some settings; individual prediction remains limited",
+      "evaluation_only": true
+    },
+    {
+      "id": "distributional_replication_2606_09013",
+      "category": "ai_persona_holdout",
+      "role": "distributional_guardrail",
+      "path": "research/source_of_truth/holdout_papers/ai_persona/2606.09013_beyond_averages_distributional_replication.pdf",
+      "title": "Beyond Averages: Evaluating LLMs on Human Survey Replication at the Distributional Level",
+      "reported_signal": "mean-level agreement can be misleading",
+      "evaluation_only": true
+    },
+    {
+      "id": "simulate_multiple_humans_2208_10264",
+      "category": "ai_persona_holdout",
+      "role": "foundational_replication_reference",
+      "path": "research/source_of_truth/holdout_papers/ai_persona/2208.10264_using_llms_to_simulate_multiple_humans.pdf",
+      "title": "Using Large Language Models to Simulate Multiple Humans and Replicate Human Subject Studies",
+      "reported_signal": "some classic findings replicate at aggregate level",
+      "evaluation_only": true
+    },
+    {
+      "id": "social_media_reactions_2604_19787",
+      "category": "ai_persona_holdout",
+      "role": "narrow_predictive_benchmark",
+      "path": "research/source_of_truth/holdout_papers/ai_persona/2604.19787_llm_agents_predict_social_media_reactions.pdf",
+      "title": "LLM Agents Predict Social Media Reactions but Do Not Outperform Text Classifiers",
+      "reported_signal": "70.7% overall reaction prediction accuracy",
+      "evaluation_only": true
+    },
+    {
+      "id": "external_validity_privacy_security_2202_14036",
+      "category": "survey_benchmark_holdout",
+      "role": "human_survey_ground_truth_reference",
+      "path": "research/source_of_truth/holdout_papers/survey_benchmarks/2202.14036_external_validity_online_privacy_security_surveys.pdf",
+      "title": "How Well Do My Results Generalize Now? The External Validity of Online Privacy and Security Surveys",
+      "reported_signal": "MTurk n=800, Prolific n=800, Prolific representative n=800, Pew n=4272",
+      "evaluation_only": true
+    }
+  ]
+}

@@ -1,0 +1,91 @@
+{
+  "fixture_id": "dev_binary_opentext_mixed_v1",
+  "data_partition": "development",
+  "evaluation_only": false,
+  "training_allowed": true,
+  "source_strategy": "construct from a non-holdout survey or interview-coded dataset with mixed structured and unstructured responses",
+  "source_documents": [
+    "research/benchmark_program/development/sources/2503.19238_unveiling_ruby_stackoverflow_developer_survey.pdf",
+    "research/benchmark_program/development/sources/2512.02058_misalignment_low_resource_settings.pdf"
+  ],
+  "forbidden_source_refs": [
+    "research/source_of_truth/holdout_papers/survey_benchmarks/2202.14036_external_validity_online_privacy_security_surveys.pdf"
+  ],
+  "population_definition": {
+    "target_population": "software developers explaining difficulty, challenge, and rationale in both structured and unstructured forms",
+    "sample_design": "development-only mixed benchmark using Stack Overflow mining plus a developer survey",
+    "target_sample_size": 154,
+    "unit_of_analysis": "survey respondent with linked topic-level challenge ratings",
+    "notes": "Used to validate binary aggregation, denominator handling, open-text evidence handling, and disagreement between observed and self-reported difficulty."
+  },
+  "questionnaire_or_task": {
+    "task_type": "mixed_questionnaire_replication",
+    "question_types": [
+      "binary",
+      "open_text",
+      "categorical"
+    ],
+    "example_constructs": [
+      "which topic is hardest",
+      "why a topic is difficult",
+      "time-consuming versus common challenge mismatch"
+    ]
+  },
+  "segment_variables": [
+    "experience_level",
+    "topic_category"
+  ],
+  "reported_findings_template": [
+    "topic prevalence from observed discussion data",
+    "developer-perceived difficulty from survey data",
+    "misalignment between observed platform metrics and human difficulty ratings"
+  ],
+  "comparison_metric": [
+    "percentage-point error",
+    "theme coverage overlap",
+    "base-aware segment comparison accuracy",
+    "rank correlation between perceived and observed difficulty"
+  ],
+  "actual_targets": [
+    {
+      "metric_id": "stack_overflow_questions",
+      "label": "Ruby Stack Overflow question count",
+      "value": 498719.0,
+      "tolerance": 10000.0,
+      "unit": "count"
+    },
+    {
+      "metric_id": "surveyed_developers",
+      "label": "Surveyed Ruby developers",
+      "value": 154.0,
+      "tolerance": 0.0,
+      "unit": "count"
+    },
+    {
+      "metric_id": "core_ruby_difficulty",
+      "label": "Developers rating Core Ruby Concepts as difficult",
+      "value": 0.316,
+      "tolerance": 0.05,
+      "unit": "ratio"
+    },
+    {
+      "metric_id": "experienced_app_quality_security_difficulty",
+      "label": "Experienced developers finding Application Quality and Security difficult",
+      "value": 0.40,
+      "tolerance": 0.05,
+      "unit": "ratio"
+    }
+  ],
+  "human_reference_summary": {
+    "source_paper": "Unveiling Ruby: Insights from Stack Overflow and Developer Survey",
+    "reported_sample_or_scale": "498,719 Ruby-related Stack Overflow questions and a survey of 154 Ruby developers",
+    "key_results": [
+      "35 topics grouped into 6 main categories",
+      "Web Application Development is the most commonly discussed category",
+      "Ruby Gem Installation and Configuration Issues is the most challenging topic in observed data",
+      "31.6% of surveyed developers identified Core Ruby Concepts as particularly difficult",
+      "Application Quality and Security is difficult for over 40% of experienced developers"
+    ]
+  },
+  "instance_status": "authoring_complete"
+}
