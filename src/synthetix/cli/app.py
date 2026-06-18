@@ -14,6 +14,7 @@ from synthetix.guardrails.preflight import estimate_run
 from synthetix.ingestion.structured import load_blueprint
 from synthetix.model_gateway.profiles import DEFAULT_PROFILES
 from synthetix.orchestration.loop import OrchestratorLoop, VerificationResult
+from synthetix.orchestration.quality_loop import QualityLoop, QualityTarget
 from synthetix.reporting.models import ReportModel
 from synthetix.reporting.renderer import render_report
 from synthetix.settings import Settings
@@ -269,6 +270,47 @@ def orchestrator_run(
     )
     result = loop.run_until_blocked(max_steps=max_steps)
     typer.echo(result.model_dump_json(indent=2))
+
+
+@app.command("quality-loop-run")
+def quality_loop_run(
+    workspace: Path = typer.Option(Path.cwd(), "--workspace", help="Workspace root to evaluate."),
+    state: Path = typer.Option(
+        Path("data/quality-loop-state.json"),
+        help="Path to the persisted quality loop state file.",
+    ),
+    progress: Path = typer.Option(
+        Path("docs/progress/quality-loop-progress.md"),
+        help="Path to append quality loop progress notes.",
+    ),
+    min_average_score: float = typer.Option(
+        0.8,
+        "--min-average-score",
+        help="Minimum average development benchmark score.",
+    ),
+    min_fixture_score: float = typer.Option(
+        0.7,
+        "--min-fixture-score",
+        help="Minimum score for every development benchmark fixture.",
+    ),
+    require_report_artifacts: bool = typer.Option(
+        True,
+        "--require-report-artifacts/--no-require-report-artifacts",
+        help="Require professional report artifacts before passing the quality loop.",
+    ),
+) -> None:
+    """Evaluate product quality and emit the next task until desired results are met."""
+    loop = QualityLoop.for_workspace(
+        workspace,
+        state_path=state,
+        progress_path=progress,
+        target=QualityTarget(
+            min_average_score=min_average_score,
+            min_fixture_score=min_fixture_score,
+            require_report_artifacts=require_report_artifacts,
+        ),
+    )
+    typer.echo(loop.run_once().model_dump_json(indent=2))
 
 
 if __name__ == "__main__":

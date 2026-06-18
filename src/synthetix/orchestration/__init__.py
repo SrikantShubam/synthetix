@@ -8,6 +8,14 @@ from synthetix.orchestration.loop import (
     TaskStatus,
     VerificationResult,
 )
+from synthetix.orchestration.quality_loop import (
+    QualityLoop,
+    QualityLoopResult,
+    QualityLoopState,
+    QualityMetrics,
+    QualityTarget,
+    QualityTask,
+)
 
 __all__ = [
     "AgentModel",
@@ -18,4 +26,10 @@ __all__ = [
     "RejectedAttempt",
     "TaskStatus",
     "VerificationResult",
+    "QualityLoop",
+    "QualityLoopResult",
+    "QualityLoopState",
+    "QualityMetrics",
+    "QualityTarget",
+    "QualityTask",
 ]

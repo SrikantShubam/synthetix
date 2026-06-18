@@ -281,3 +281,41 @@ def test_cli_orchestrator_run_writes_progress_until_blocked(tmp_path: Path) -> N
     assert "blocked_task" in result.stdout
     assert "02-pipeline-predicted-metrics" in result.stdout
     assert progress_path.exists()
+
+
+def test_cli_quality_loop_run_reports_next_task(tmp_path: Path) -> None:
+    runner = CliRunner()
+    summary_path = tmp_path / "data/benchmark-results/development/summary.json"
+    summary_path.parent.mkdir(parents=True)
+    summary_path.write_text(
+        """
+{
+  "fixture_count": 1,
+  "reports": [
+    {"fixture_id": "a", "summary": {"score": 0.25, "mean_absolute_error": 0.2}}
+  ]
+}
+""".strip(),
+        encoding="utf-8",
+    )
+
+    result = runner.invoke(
+        app,
+        [
+            "quality-loop-run",
+            "--workspace",
+            str(tmp_path),
+            "--state",
+            str(tmp_path / "data/quality-loop-state.json"),
+            "--progress",
+            str(tmp_path / "docs/progress/quality-loop-progress.md"),
+            "--min-average-score",
+            "0.8",
+            "--min-fixture-score",
+            "0.7",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "improve-predicted-metrics" in result.stdout
+    assert (tmp_path / "docs/progress/quality-loop-progress.md").exists()
