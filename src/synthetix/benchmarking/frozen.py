@@ -16,6 +16,7 @@ EvaluationSplit = Literal["validation", "holdout"]
 
 class FrozenManifest(BaseModel):
     split: EvaluationSplit
+    cycle_id: str = "cycle_001"
     status: Literal["frozen"] = "frozen"
     manifest_path: str
     frozen_at_utc: str
@@ -26,6 +27,7 @@ class FrozenManifest(BaseModel):
 
 class FrozenQualitySummary(BaseModel):
     split: EvaluationSplit
+    cycle_id: str
     quality_status: Literal["passed", "failed"]
     fixture_count: int
     average_score: float
@@ -45,9 +47,16 @@ class FrozenEvaluation:
     def for_workspace(cls, workspace: Path) -> "FrozenEvaluation":
         return cls(workspace.resolve())
 
-    def freeze(self, *, split: EvaluationSplit, output_path: Path) -> FrozenManifest:
+    def freeze(
+        self,
+        *,
+        split: EvaluationSplit,
+        output_path: Path,
+        cycle_id: str = "cycle_001",
+    ) -> FrozenManifest:
         manifest = FrozenManifest(
             split=split,
+            cycle_id=cycle_id,
             manifest_path=self._relative(output_path),
             frozen_at_utc=datetime.now(UTC).replace(microsecond=0).isoformat(),
             artifact_hashes=self._artifact_hashes(split),
@@ -82,6 +91,7 @@ class FrozenEvaluation:
         min_fixture_score: float = 0.7,
     ) -> FrozenQualitySummary:
         freeze_manifest = self._assert_freeze_integrity(split)
+        manifest = FrozenManifest.model_validate_json(freeze_manifest.read_text(encoding="utf-8"))
         summary = BenchmarkComparator.compare_directory(
             fixture_dir=self._fixture_dir(split),
             predicted_dir=predicted_dir,
@@ -89,6 +99,7 @@ class FrozenEvaluation:
         )
         quality = self._quality_summary(
             split=split,
+            cycle_id=manifest.cycle_id,
             summary=summary,
             min_average_score=min_average_score,
             min_fixture_score=min_fixture_score,
@@ -166,6 +177,7 @@ class FrozenEvaluation:
         self,
         *,
         split: EvaluationSplit,
+        cycle_id: str,
         summary: dict[str, object],
         min_average_score: float,
         min_fixture_score: float,
@@ -199,6 +211,7 @@ class FrozenEvaluation:
         ]
         return FrozenQualitySummary(
             split=split,
+            cycle_id=cycle_id,
             quality_status="passed" if passed else "failed",
             fixture_count=fixture_count,
             average_score=average_score,

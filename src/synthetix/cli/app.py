@@ -12,6 +12,7 @@ from synthetix.benchmarking.loop import BenchmarkLoop
 from synthetix.benchmarking.predictions import DevelopmentPredictionEmitter
 from synthetix.benchmarking.runtime import BenchmarkComparator
 from synthetix.guardrails.preflight import estimate_run
+from synthetix.guardrails.question_quality import assess_question_quality, question_quality_errors
 from synthetix.ingestion.structured import load_blueprint
 from synthetix.model_gateway.profiles import DEFAULT_PROFILES
 from synthetix.orchestration.loop import OrchestratorLoop, VerificationResult
@@ -32,11 +33,17 @@ app = typer.Typer(
 def validate(path: Path) -> None:
     """Validate a JSON or YAML SimulationBlueprint without model calls."""
     blueprint = load_blueprint(path)
+    findings = assess_question_quality(blueprint)
+    errors = question_quality_errors(blueprint)
     typer.echo(
         f"Valid blueprint: {blueprint.title} "
         f"({blueprint.population.size} personas, {len(blueprint.questions)} questions)"
     )
     typer.echo(f"SHA-256: {blueprint.content_hash()}")
+    for finding in findings:
+        typer.echo(f"{finding.severity.upper()} {finding.code} [{finding.question_id or '-'}]: {finding.message}")
+    if errors:
+        raise typer.Exit(code=1)
 
 
 @app.command()
@@ -218,11 +225,16 @@ def benchmark_freeze(
         "--output",
         help="Path to write the immutable freeze manifest.",
     ),
+    cycle_id: str = typer.Option(
+        "cycle_001",
+        "--cycle-id",
+        help="Evaluation cycle identifier recorded in the freeze manifest.",
+    ),
 ) -> None:
     """Freeze validation or holdout artifacts before one-shot evaluation."""
     evaluator = FrozenEvaluation.for_workspace(Path.cwd())
     output_path = output or Path(f"data/frozen-evaluations/{split}/freeze-manifest.json")
-    manifest = evaluator.freeze(split=split, output_path=output_path)
+    manifest = evaluator.freeze(split=split, output_path=output_path, cycle_id=cycle_id)
     typer.echo(manifest.model_dump_json(indent=2))
 
 

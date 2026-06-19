@@ -126,3 +126,25 @@
 - artifacts: `src/synthetix/orchestration, tests, docs/specs`
 - checks: `{'unit_tests': True, 'integration_tests': True, 'policy_gates': True}`
 
+## Dispatch: 07-honest-predictor-improvement
+
+- model: `gpt-5.4`
+- allowed paths: `src/synthetix, tests, docs/specs, data/benchmark-predictions`
+- forbidden paths: `research/source_of_truth, data/benchmark-results/holdout`
+- checks: `unit_tests, integration_tests, benchmark_comparison, policy_gates`
+- implementation prompt ready: `True`
+
+
+### In Progress: 07-honest-predictor-improvement
+
+- removed prediction-time use of `registry_summary` from `src/synthetix/benchmarking/metrics.py`
+- added structured-source derivation from `docs/benchmarks/registry.json`
+- added conservative semantic priors in `src/synthetix/benchmarking/predictions.py`
+- added anti-leakage unit coverage for registry-source derivation and semantic priors
+- development benchmark rerun summary: scores `0.6667, 0.75, 1.0, 1.0, 1.0`
+- validation frozen rerun summary: average `1.0`, but both fixtures are metadata-count tasks and are not strong realism evidence
+- remaining blockers:
+  - `dev_attitudes_values_survey_v1` still misses `value_question_count`
+  - `dev_binary_opentext_mixed_v1` still lacks a legitimate non-answer-bearing source for `stack_overflow_questions`
+  - consumer report quality packet remains separate and is not resolved here
+

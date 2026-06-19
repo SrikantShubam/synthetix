@@ -1,0 +1,23 @@
+{
+  "active_feature": "existing-project-sdlc-baseline",
+  "blocked_reasons": [],
+  "current_phase": "implementation",
+  "implementation_allowed": true,
+  "last_context_generated_at": "2026-06-19T19:24:35.624392+00:00",
+  "last_final_eval": {
+    "passed": false,
+    "path": "C:\\experiments\\stimulate a and b\\sdlc\\eval_results\\final.latest.json",
+    "timestamp": "2026-06-19T14:45:24.702159+00:00"
+  },
+  "last_gryph_ingest_at": "2026-06-19T19:24:28.151120+00:00",
+  "last_plan_eval": {
+    "passed": true,
+    "path": "C:\\experiments\\stimulate a and b\\sdlc\\eval_results\\plan.latest.json",
+    "timestamp": "2026-06-19T13:00:36.702965+00:00"
+  },
+  "last_readiness_eval": {
+    "passed": true,
+    "path": "C:\\experiments\\stimulate a and b\\sdlc\\eval_results\\readiness.latest.json",
+    "timestamp": "2026-06-19T13:00:53.115724+00:00"
+  }
+}

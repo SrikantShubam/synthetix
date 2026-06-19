@@ -1,0 +1,20 @@
+{
+  "version": "1.0",
+  "data_partition": "holdout",
+  "evaluation_only": true,
+  "training_allowed": false,
+  "fixtures": [
+    {
+      "fixture_id": "holdout_privacy_personas_topline_v1",
+      "path": "research/benchmark_program/holdout_targets/privacy_personas_topline_v1.json",
+      "source_paper_id": "ai_persona_privacy_decisions_2603_19791",
+      "review_status": "draft_reviewed"
+    },
+    {
+      "fixture_id": "holdout_social_media_reactions_topline_v1",
+      "path": "research/benchmark_program/holdout_targets/social_media_reactions_topline_v1.json",
+      "source_paper_id": "social_media_reactions_2604_19787",
+      "review_status": "draft_reviewed"
+    }
+  ]
+}

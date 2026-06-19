@@ -52,6 +52,22 @@
     "human-versus-model accuracy gap",
     "subgroup fidelity gap"
   ],
+  "prediction_contract": {
+    "metrics": [
+      {
+        "metric_id": "human_accuracy",
+        "unit": "ratio"
+      },
+      {
+        "metric_id": "best_model_accuracy",
+        "unit": "ratio"
+      },
+      {
+        "metric_id": "respondent_item_instances",
+        "unit": "count"
+      }
+    ]
+  },
   "actual_targets": [
     {
       "metric_id": "human_accuracy",

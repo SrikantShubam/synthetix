@@ -1,0 +1,98 @@
+schema_version: "1.0"
+title: Fast-food sandwich pricing study
+purpose: Explore perceived price fairness, hesitation drivers, and wording issues before human fieldwork.
+population:
+  size: 8
+  seed: 20260620
+  attributes:
+    age: ["18-24", "25-34"]
+    dining_style: ["value-seeking", "convenience-first"]
+  psychographics:
+    - compares menu prices against portion and bundle expectations
+    - reacts quickly to pricing that feels out of line with nearby alternatives
+model:
+  profile: openrouter-default
+  temperature: 0.2
+  max_output_tokens: 500
+questions:
+  - type: likert
+    id: price_fairness
+    prompt: How fair does the $9.49 standalone price feel for the sandwich?
+    minimum: 1
+    maximum: 5
+    minimum_label: Very unfair
+    maximum_label: Very fair
+  - type: choice
+    id: main_hesitation
+    prompt: What is the main reason this persona might hesitate to buy it?
+    options: ["Price too high", "Portion uncertainty", "Taste uncertainty", "No hesitation"]
+  - type: open_text
+    id: hesitation_reason
+    prompt: What is the main reason behind that hesitation or reaction?
+  - type: open_text
+    id: wording_feedback
+    prompt: What part of this questionnaire feels unclear, leading, or weak?
+research_design:
+  study_type: concept_test
+  research_objectives:
+    - Measure perceived price fairness.
+    - Identify the main purchase barrier.
+    - Diagnose weak questionnaire wording before fieldwork.
+  decision_questions:
+    - Should the current sandwich price be tested with human respondents?
+    - Which objection needs mitigation first?
+    - Which question wording should be revised before fielding?
+  assumptions:
+    - Synthetic outputs are exploratory only.
+    - Pricing reactions may overstate certainty in a small synthetic population.
+  target_population_definition:
+    inclusion_rules: ["Adults who buy fast-food meals for themselves."]
+    exclusion_rules: ["Non-purchasers outside the category."]
+    geography: "United States"
+    timeframe: "Current quick-service dining context"
+    unit_of_analysis: "Fast-food purchase decision-maker"
+  sampling_or_simulation_frame:
+    persona_generation_frame: "Declared age by dining-style grid."
+    quotas_or_weights: ["No weighting applied."]
+    uncovered_groups: ["Undeclared income bands and geographies."]
+  segmentation_plan:
+    segment_variables: ["age", "dining_style"]
+    planned_cuts: ["age", "dining_style"]
+    minimum_base_rule: "Suppress slices below n=2."
+    suppression_rule: "Mark suppressed slices explicitly."
+  question_role_map:
+    price_fairness: primary_outcome
+    main_hesitation: driver
+    hesitation_reason: qualitative_probe
+    wording_feedback: diagnostic
+  analysis_plan:
+    toplines: ["Price fairness topline.", "Main hesitation topline."]
+    cross_tabs: ["Price fairness by age.", "Main hesitation by dining style."]
+    likert_summaries: ["Top-2 box fairness read."]
+    rankings: []
+    theme_coding: ["Barrier rationale themes.", "Questionnaire wording problems."]
+    sensitivity_checks: ["Review invalid attempts and response refusals."]
+    benchmark_checks: ["Use selected metric pass rate wording only."]
+  qualitative_coding_plan:
+    coding_mode: deterministic
+    theme_granularity: "Semantic barrier and wording themes"
+    quote_evidence_required: true
+    minimum_theme_count: 2
+  report_requirements:
+    report_tier: professional
+    required_sections: ["research_design", "objective_coverage", "standards_alignment_appendix"]
+    minimum_figures: 2
+    minimum_tables: 3
+    appendix_requirements: ["Planned-vs-delivered appendix"]
+    audience_level: professional
+  disclosure_plan:
+    synthetic_only_warning: true
+    non_inferential_limits: true
+    model_provider_provenance: true
+    data_quality_notes: ["Synthetic scenario evidence only."]
+  standards_alignment:
+    iso_20252: ["Purpose and process disclosure."]
+    aapor_disclosure: ["Questionnaire and denominator disclosure."]
+    icc_esomar: ["Transparency disclosure."]
+limitations:
+  - This synthetic exploration does not replace human price testing.

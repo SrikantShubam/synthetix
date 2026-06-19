@@ -16,6 +16,7 @@ from synthetix.reporting.models import (
     ExecutiveFinding,
     FailureSummary,
     MethodologySummary,
+    ObjectiveCoverage,
     ProvenanceSummary,
     QuestionReport,
     ReportModel,
@@ -97,7 +98,7 @@ def _rich_report() -> ReportModel:
                 themes=[
                     ThemeEvidence(
                         theme_id="q2:theme:1",
-                        label="Price would require a very obvious payback story.",
+                        label="Price sensitivity and value concern",
                         count=2,
                         supporting_quote_ids=["q2:p1", "q2:p2"],
                     )
@@ -117,6 +118,96 @@ def _rich_report() -> ReportModel:
                 summary="Negative responses referenced price pressure before missing features.",
                 question_id="q2",
                 evidence_quote_ids=["q2:p1", "q2:p2"],
+            ),
+        ],
+        research_design={
+            "study_type": "concept_test",
+            "research_objectives": [
+                "Measure concept fit by segment.",
+                "Identify primary adoption barriers.",
+            ],
+            "decision_questions": [
+                "Should the concept move forward?",
+                "Which objections need mitigation first?",
+            ],
+            "assumptions": [
+                "Synthetic responses are exploratory only.",
+                "Small synthetic populations can overstate consensus.",
+            ],
+            "target_population_definition": {
+                "inclusion_rules": ["Adults in the target workflow."],
+                "exclusion_rules": ["No minors."],
+                "unit_of_analysis": "Decision-maker",
+                "geography": "United States",
+                "timeframe": "Current operating context",
+            },
+            "sampling_or_simulation_frame": {
+                "persona_generation_frame": "Declared region and role attribute grid.",
+                "quotas_or_weights": ["No weighting applied."],
+                "uncovered_groups": ["Undeclared occupations."],
+            },
+            "segmentation_plan": {
+                "segment_variables": ["region", "role"],
+                "planned_cuts": ["region", "role"],
+                "minimum_base_rule": "Suppress slices below n=2.",
+                "suppression_rule": "Mark suppressed slices explicitly.",
+            },
+            "question_role_map": {"q1": "primary_outcome", "q2": "qualitative_probe"},
+            "analysis_plan": {
+                "toplines": ["Concept fit topline."],
+                "cross_tabs": ["Concept fit by region and role."],
+                "likert_summaries": [],
+                "rankings": [],
+                "theme_coding": ["Barrier themes from q2."],
+                "sensitivity_checks": ["Review failed attempts."],
+                "benchmark_checks": [
+                    "Any benchmark comparison is described as selected metric pass rate only."
+                ],
+            },
+            "qualitative_coding_plan": {
+                "coding_mode": "deterministic",
+                "theme_granularity": "Barrier themes",
+                "quote_evidence_required": True,
+                "minimum_theme_count": 1,
+            },
+            "report_requirements": {
+                "report_tier": "professional",
+                "required_sections": [
+                    "research_design",
+                    "objective_coverage",
+                    "standards_alignment_appendix",
+                ],
+                "minimum_figures": 1,
+                "minimum_tables": 2,
+                "appendix_requirements": ["Planned-vs-delivered appendix"],
+                "audience_level": "professional",
+            },
+            "disclosure_plan": {
+                "synthetic_only_warning": True,
+                "non_inferential_limits": True,
+                "model_provider_provenance": True,
+                "data_quality_notes": ["Synthetic scenario evidence only."],
+            },
+            "standards_alignment": {
+                "iso_20252": ["Purpose and process disclosure."],
+                "aapor_disclosure": ["Questionnaire and denominator disclosure."],
+                "icc_esomar": ["Transparency disclosure."],
+            },
+        },
+        objective_coverage=[
+            ObjectiveCoverage(
+                objective="Measure concept fit by segment.",
+                decision_question="Should the concept move forward?",
+                covered_question_ids=["q1"],
+                status="covered",
+                notes="Covered by primary outcome toplines and segment cuts.",
+            ),
+            ObjectiveCoverage(
+                objective="Identify primary adoption barriers.",
+                decision_question="Which objections need mitigation first?",
+                covered_question_ids=["q2"],
+                status="covered",
+                notes="Covered by qualitative themes and evidence.",
             ),
         ],
         segment_composition=[
@@ -218,13 +309,16 @@ def test_report_pipeline_renders_executive_and_appendix_sections(
     assert "Table of contents" in html
     assert "Executive findings" in html
     assert "Population composition" in html
+    assert "Research design" in html
     assert "Question distributions" in html
     assert "Segment comparisons" in html
     assert "Qualitative themes and evidence" in html
     assert "Failures and sensitivity" in html
     assert "Methodology" in html
+    assert "Objective coverage" in html
     assert "Provenance" in html
     assert "Limitations" in html
+    assert "Standards-aligned disclosure appendix" in html
     assert "Technical appendix" in html
     assert "Figure 1." in html
     assert "Table 1." in html
@@ -235,7 +329,9 @@ def test_report_pipeline_renders_executive_and_appendix_sections(
     text = "\n".join(page.extract_text() or "" for page in PdfReader(artifacts.pdf_path).pages)
     assert "Board readout: synthetic scenario exploration" in text
     assert "Executive findings" in text
+    assert "Research design" in text
     assert "Question distributions" in text
+    assert "Objective coverage" in text
     assert "Technical appendix" in text
     assert "Non-inferential use warning" in text
 
@@ -247,6 +343,140 @@ def test_report_pipeline_renders_executive_and_appendix_sections(
     checksums = json.loads(artifacts.checksums_path.read_text(encoding="utf-8"))
     assert "report.pdf" in checksums
     assert "report.html" in checksums
+
+
+def test_report_pipeline_uses_theme_tables_not_raw_open_text_charts(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    _install_fake_weasyprint(monkeypatch)
+    report = _rich_report().model_copy(
+        update={
+            "questions": [
+                QuestionReport(
+                    question_id="offset_reaction",
+                    prompt="What is your immediate emotional reaction when an online checkout screen prompts you to donate to offset your carbon footprint?",
+                    question_type="open_text",
+                    response_count=5,
+                    distribution=Distribution(
+                        labels=[
+                            "I feel suspicious because it shifts responsibility to consumers.",
+                            "I feel skeptical and cautious about whether the offset is real.",
+                        ],
+                        values=[3, 2],
+                    ),
+                    quotes=[
+                        "I feel suspicious because it shifts responsibility to consumers.",
+                        "I feel skeptical and cautious about whether the offset is real.",
+                    ],
+                    denominators=DenominatorSummary(
+                        total_personas=5,
+                        succeeded_personas=5,
+                        answered_responses=5,
+                        valid_responses=5,
+                    ),
+                    themes=[
+                        ThemeEvidence(
+                            theme_id="offset_reaction:theme:1",
+                            label="Suspicion about shifting responsibility",
+                            count=3,
+                            supporting_quote_ids=["offset:p1", "offset:p2", "offset:p3"],
+                        ),
+                        ThemeEvidence(
+                            theme_id="offset_reaction:theme:2",
+                            label="Skepticism about impact credibility",
+                            count=2,
+                            supporting_quote_ids=["offset:p4", "offset:p5"],
+                        ),
+                    ],
+                )
+            ]
+        }
+    )
+
+    artifacts = render_report(report, tmp_path)
+    html = artifacts.html_path.read_text(encoding="utf-8")
+
+    assert len(artifacts.chart_paths) == 1
+    assert "Suspicion about shifting responsibility" in html
+    assert "Skepticism about impact credibility" in html
+    assert "I feel suspicious because it shifts responsibility to consumers." in html
+    assert "Traceable synthetic evidence" in html
+
+
+def test_report_pipeline_uses_semantic_theme_labels_for_qualitative_summary(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    _install_fake_weasyprint(monkeypatch)
+    report = _rich_report()
+
+    artifacts = render_report(report, tmp_path)
+    html = artifacts.html_path.read_text(encoding="utf-8")
+
+    assert "Price sensitivity and value concern" in html
+    assert "Price would require a very obvious payback story." in html
+    assert "most repeated exact-response wording" not in html.casefold()
+
+
+def test_report_pipeline_wraps_long_chart_labels_for_choice_questions(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    _install_fake_weasyprint(monkeypatch)
+    report = _rich_report().model_copy(
+        update={
+            "questions": [
+                QuestionReport(
+                    question_id="premium_likelihood",
+                    prompt="How likely are you to pay an additional $4.50 premium per delivery if a brand displays a carbon-neutral shipping badge at checkout?",
+                    question_type="choice",
+                    response_count=5,
+                    distribution=Distribution(
+                        labels=[
+                            "Very likely",
+                            "Somewhat likely",
+                            "Not sure yet",
+                            "Somewhat unlikely",
+                            "Very unlikely",
+                        ],
+                        values=[1, 1, 1, 1, 1],
+                    ),
+                    denominators=DenominatorSummary(
+                        total_personas=5,
+                        succeeded_personas=5,
+                        answered_responses=5,
+                        valid_responses=5,
+                    ),
+                )
+            ]
+        }
+    )
+
+    artifacts = render_report(report, tmp_path)
+
+    assert len(artifacts.chart_paths) == 1
+    assert artifacts.chart_paths[0].exists()
+
+
+def test_renderer_sanitizes_narrative_chart_labels() -> None:
+    question = {
+        "question_type": "open_text",
+        "question_id": "offset_reaction",
+        "labels": [
+            "I feel suspicious because the company is shifting responsibility onto consumers.",
+            "I feel skeptical because I do not trust the carbon-offset claims.",
+        ],
+    }
+
+    assert renderer._chart_labels(question) == ["Response 1", "Response 2"]
+
+
+def test_renderer_uses_compact_chart_title() -> None:
+    question = {
+        "question_type": "choice",
+        "question_id": "premium_likelihood",
+        "prompt": "How likely are you to pay an additional $4.50 premium per delivery if a brand displays a certified carbon-neutral badge at checkout?",
+    }
+
+    assert renderer._chart_title(question) == "Response distribution"
 
 
 def test_report_pipeline_fails_explicitly_without_weasyprint(

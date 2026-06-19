@@ -9,7 +9,8 @@ from synthetix.blueprints.models import SimulationBlueprint
 from synthetix.execution.executor import RunExecutor
 from synthetix.execution.manifest import RunManifest
 from synthetix.execution.models import RunStatus
-from synthetix.guardrails.preflight import PreflightEstimate, estimate_run
+from synthetix.guardrails.preflight import GuardrailViolation, PreflightEstimate, estimate_run
+from synthetix.guardrails.question_quality import question_quality_errors
 from synthetix.model_gateway.openrouter import OpenRouterGateway
 from synthetix.model_gateway.profiles import DEFAULT_PROFILES
 from synthetix.persistence.database import Database
@@ -38,6 +39,12 @@ class RunService:
     async def create_draft(
         self, blueprint: SimulationBlueprint, *, source_hashes: dict[str, str]
     ) -> str:
+        quality_errors = question_quality_errors(blueprint)
+        if quality_errors:
+            raise GuardrailViolation(
+                "Question quality guardrails failed: "
+                + "; ".join(f"{finding.question_id}: {finding.message}" for finding in quality_errors)
+            )
         run_id = uuid.uuid4().hex[:12]
         await self.repository.create(run_id, blueprint)
         profile = DEFAULT_PROFILES.get(blueprint.model.profile)

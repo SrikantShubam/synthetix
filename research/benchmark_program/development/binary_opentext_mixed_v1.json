@@ -46,6 +46,26 @@
     "base-aware segment comparison accuracy",
     "rank correlation between perceived and observed difficulty"
   ],
+  "prediction_contract": {
+    "metrics": [
+      {
+        "metric_id": "stack_overflow_questions",
+        "unit": "count"
+      },
+      {
+        "metric_id": "surveyed_developers",
+        "unit": "count"
+      },
+      {
+        "metric_id": "core_ruby_difficulty",
+        "unit": "ratio"
+      },
+      {
+        "metric_id": "experienced_app_quality_security_difficulty",
+        "unit": "ratio"
+      }
+    ]
+  },
   "actual_targets": [
     {
       "metric_id": "stack_overflow_questions",

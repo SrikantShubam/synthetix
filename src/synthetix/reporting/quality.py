@@ -6,10 +6,12 @@ import re
 from pathlib import Path
 from typing import Literal
 
+from pypdf import PdfReader
 from pydantic import BaseModel, Field
 
 from synthetix.reporting.models import ReportModel
 from synthetix.reporting.renderer import ReportArtifacts
+from synthetix.reporting.renderer import _chart_labels as renderer_chart_labels
 
 
 CATEGORY_WEIGHTS: dict[str, float] = {
@@ -83,6 +85,25 @@ class AttritionEvidence(BaseModel):
     counts: dict[str, int] = Field(default_factory=dict)
 
 
+class ReportDepthEvidence(BaseModel):
+    pdf_pages: int = Field(default=0, ge=0)
+    word_count: int = Field(default=0, ge=0)
+    chart_count: int = Field(default=0, ge=0)
+    table_count: int = Field(default=0, ge=0)
+    question_count: int = Field(default=0, ge=0)
+    segment_cut_count: int = Field(default=0, ge=0)
+    qualitative_theme_count: int = Field(default=0, ge=0)
+    traceable_quote_count: int = Field(default=0, ge=0)
+    min_pdf_pages: int = Field(default=12, ge=1)
+    min_word_count: int = Field(default=3000, ge=1)
+    min_chart_count: int = Field(default=6, ge=1)
+    min_table_count: int = Field(default=8, ge=1)
+    min_question_count: int = Field(default=3, ge=1)
+    min_segment_cut_count: int = Field(default=4, ge=1)
+    min_qualitative_theme_count: int = Field(default=6, ge=1)
+    min_traceable_quote_count: int = Field(default=12, ge=1)
+
+
 class ReportQualityInput(BaseModel):
     category_scores: CategoryScores
     chart_labels: list[str] = Field(default_factory=list)
@@ -96,6 +117,20 @@ class ReportQualityInput(BaseModel):
     non_inferential_warning_present: bool = False
     claim_texts: list[str] = Field(default_factory=list)
     attrition: AttritionEvidence = Field(default_factory=AttritionEvidence)
+    report_depth: ReportDepthEvidence = Field(default_factory=ReportDepthEvidence)
+    research_design_tier: str = "lightweight_exploration"
+    objective_coverage: list[dict[str, object]] = Field(default_factory=list)
+    research_objectives: list[str] = Field(default_factory=list)
+    decision_questions: list[str] = Field(default_factory=list)
+    assumptions: list[str] = Field(default_factory=list)
+    target_population_summary: str = ""
+    sampling_frame_summary: str = ""
+    segmentation_plan_summary: str = ""
+    analysis_plan_summary: str = ""
+    qualitative_coding_summary: str = ""
+    standards_alignment_texts: list[str] = Field(default_factory=list)
+    benchmark_wording_texts: list[str] = Field(default_factory=list)
+    typed_answer_issues: list[str] = Field(default_factory=list)
 
 
 class HardGateResult(BaseModel):
@@ -146,6 +181,7 @@ class ReportQualityScorer:
         weighted_breakdown = report_input.category_scores.weighted_breakdown()
         total_score = round(sum(weighted_breakdown.values()), 2)
         hard_gates = [
+            self._check_typed_answer_integrity(report_input.typed_answer_issues),
             self._check_chart_labels(report_input.chart_labels),
             self._check_denominators(report_input.percentages),
             self._check_key_findings(report_input.key_findings),
@@ -159,9 +195,28 @@ class ReportQualityScorer:
             self._check_warning(report_input.non_inferential_warning_present),
             self._check_inferential_claims(report_input.claim_texts),
             self._check_attrition(report_input.attrition),
+            self._check_report_depth(report_input.report_depth),
+            self._check_research_design_requirement(report_input.research_design_tier),
+            self._check_objective_coverage(
+                report_input.research_design_tier,
+                report_input.objective_coverage,
+                report_input.decision_questions,
+            ),
+            self._check_standards_alignment(
+                report_input.research_design_tier,
+                report_input.assumptions,
+                report_input.target_population_summary,
+                report_input.sampling_frame_summary,
+                report_input.segmentation_plan_summary,
+                report_input.analysis_plan_summary,
+                report_input.qualitative_coding_summary,
+                report_input.standards_alignment_texts,
+            ),
+            self._check_benchmark_wording(report_input.benchmark_wording_texts),
         ]
-        passes_threshold = total_score >= self.passing_threshold
-        accepted = passes_threshold and all(gate.passed for gate in hard_gates)
+        all_gates_passed = all(gate.passed for gate in hard_gates)
+        passes_threshold = total_score >= self.passing_threshold and all_gates_passed
+        accepted = passes_threshold and all_gates_passed
         return ReportQualityScore(
             total_score=total_score,
             threshold=self.passing_threshold,
@@ -169,6 +224,15 @@ class ReportQualityScorer:
             accepted=accepted,
             weighted_breakdown=weighted_breakdown,
             hard_gates=hard_gates,
+        )
+
+    def _check_typed_answer_integrity(self, issues: list[str]) -> HardGateResult:
+        return HardGateResult(
+            name="typed_answer_integrity",
+            passed=not issues,
+            detail="Typed question outputs use valid categorical or numeric answer labels."
+            if not issues
+            else "Invalid typed-answer labels: " + "; ".join(issues),
         )
 
     def _check_chart_labels(self, labels: list[str]) -> HardGateResult:
@@ -271,7 +335,8 @@ class ReportQualityScorer:
         claims = [
             text
             for text in claim_texts
-            if any(pattern.search(text) for pattern in _INFERENTIAL_CLAIM_PATTERNS)
+            if not _is_non_inferential_limit_warning(text)
+            and any(pattern.search(text) for pattern in _INFERENTIAL_CLAIM_PATTERNS)
         ]
         return HardGateResult(
             name="no_inferential_claims",
@@ -296,6 +361,148 @@ class ReportQualityScorer:
             else "Attrition omits failed or refused respondents despite non-zero counts.",
         )
 
+    def _check_report_depth(self, depth: ReportDepthEvidence) -> HardGateResult:
+        missing = []
+        if depth.pdf_pages < depth.min_pdf_pages:
+            missing.append(f"pdf_pages {depth.pdf_pages} < {depth.min_pdf_pages}")
+        if depth.word_count < depth.min_word_count:
+            missing.append(f"word_count {depth.word_count} < {depth.min_word_count}")
+        if depth.chart_count < depth.min_chart_count:
+            missing.append(f"chart_count {depth.chart_count} < {depth.min_chart_count}")
+        if depth.table_count < depth.min_table_count:
+            missing.append(f"table_count {depth.table_count} < {depth.min_table_count}")
+        if depth.question_count < depth.min_question_count:
+            missing.append(f"question_count {depth.question_count} < {depth.min_question_count}")
+        if depth.segment_cut_count < depth.min_segment_cut_count:
+            missing.append(
+                f"segment_cut_count {depth.segment_cut_count} < {depth.min_segment_cut_count}"
+            )
+        if depth.qualitative_theme_count < depth.min_qualitative_theme_count:
+            missing.append(
+                "qualitative_theme_count "
+                f"{depth.qualitative_theme_count} < {depth.min_qualitative_theme_count}"
+            )
+        if depth.traceable_quote_count < depth.min_traceable_quote_count:
+            missing.append(
+                "traceable_quote_count "
+                f"{depth.traceable_quote_count} < {depth.min_traceable_quote_count}"
+            )
+        return HardGateResult(
+            name="professional_report_depth",
+            passed=not missing,
+            detail="Report meets professional depth thresholds."
+            if not missing
+            else "Insufficient depth: " + "; ".join(missing),
+        )
+
+    def _check_research_design_requirement(self, tier: str) -> HardGateResult:
+        professional = tier == "professional"
+        return HardGateResult(
+            name="professional_research_design_required",
+            passed=professional,
+            detail="Professional report tier uses an explicit or confirmed ResearchDesign."
+            if professional
+            else "Lightweight exploration plans may execute but cannot pass professional report quality gates.",
+        )
+
+    def _check_objective_coverage(
+        self,
+        tier: str,
+        objective_coverage: list[dict[str, object]],
+        decision_questions: list[str],
+    ) -> HardGateResult:
+        if tier != "professional":
+            return HardGateResult(
+                name="research_objectives_covered",
+                passed=False,
+                detail="Objective coverage is only accepted for professional ResearchDesign plans.",
+            )
+        if not objective_coverage or not decision_questions:
+            return HardGateResult(
+                name="research_objectives_covered",
+                passed=False,
+                detail="Missing objective coverage or decision questions.",
+            )
+        missing = []
+        for item in objective_coverage:
+            covered = item.get("covered_question_ids")
+            status = str(item.get("status", ""))
+            if not isinstance(covered, list) or not covered or status == "gap":
+                missing.append(str(item.get("objective", "unknown_objective")))
+        return HardGateResult(
+            name="research_objectives_covered",
+            passed=not missing,
+            detail="Every research objective maps to covered questions and decision support."
+            if not missing
+            else f"Missing objective coverage for: {missing}",
+        )
+
+    def _check_standards_alignment(
+        self,
+        tier: str,
+        assumptions: list[str],
+        target_population_summary: str,
+        sampling_frame_summary: str,
+        segmentation_plan_summary: str,
+        analysis_plan_summary: str,
+        qualitative_coding_summary: str,
+        standards_alignment_texts: list[str],
+    ) -> HardGateResult:
+        if tier != "professional":
+            return HardGateResult(
+                name="standards_alignment_disclosure_complete",
+                passed=False,
+                detail="Lightweight exploration plans do not satisfy the professional standards-aligned disclosure gate.",
+            )
+        missing = []
+        if not assumptions:
+            missing.append("assumptions")
+        if not target_population_summary.strip():
+            missing.append("target_population")
+        if not sampling_frame_summary.strip():
+            missing.append("simulation_frame")
+        if not segmentation_plan_summary.strip():
+            missing.append("segmentation_plan")
+        if not analysis_plan_summary.strip():
+            missing.append("analysis_plan")
+        if not qualitative_coding_summary.strip():
+            missing.append("qualitative_coding_plan")
+        if not standards_alignment_texts:
+            missing.append("standards_alignment")
+        return HardGateResult(
+            name="standards_alignment_disclosure_complete",
+            passed=not missing,
+            detail="Professional report includes study-plan and standards-aligned disclosure coverage."
+            if not missing
+            else f"Missing disclosure coverage for: {missing}",
+        )
+
+    def _check_benchmark_wording(self, wording_texts: list[str]) -> HardGateResult:
+        joined = " ".join(wording_texts).casefold()
+        banned_accuracy = re.search(r"\baccuracy\b", joined) is not None
+        required_label = "selected metric pass rate" in joined
+        banned_replication = any(
+            phrase in joined
+            for phrase in (
+                "full paper replication",
+                "full table replication",
+                "full chart replication",
+                "full wording replication",
+                "full report replication",
+            )
+        )
+        passed = required_label and not banned_accuracy and not banned_replication
+        detail = (
+            "Benchmark wording uses selected metric pass rate language and avoids replication claims."
+            if passed
+            else "Benchmark wording must use selected metric pass rate language and avoid broad accuracy or replication claims."
+        )
+        return HardGateResult(
+            name="benchmark_wording_uses_selected_metric_pass_rate",
+            passed=passed,
+            detail=detail,
+        )
+
 
 def _looks_like_narrative_label(label: str) -> bool:
     stripped = label.strip()
@@ -307,6 +514,11 @@ def _looks_like_narrative_label(label: str) -> bool:
     return any(marker in stripped for marker in (".", "!", "?", ";", ":", "\n"))
 
 
+def _is_non_inferential_limit_warning(text: str) -> bool:
+    lowered = text.casefold()
+    return "do not infer" in lowered or "non-inferential" in lowered
+
+
 def build_quality_input(report: ReportModel, artifacts: ReportArtifacts) -> ReportQualityInput:
     checksums = {}
     if artifacts.checksums_path.exists():
@@ -315,7 +527,12 @@ def build_quality_input(report: ReportModel, artifacts: ReportArtifacts) -> Repo
     chart_labels = [
         label
         for question in report.questions
-        for label in question.distribution.labels
+        for label in renderer_chart_labels(
+            {
+                "question_type": question.question_type,
+                "labels": question.distribution.labels,
+            }
+        )
     ]
     percentages = [
         PercentageEvidence(
@@ -348,6 +565,54 @@ def build_quality_input(report: ReportModel, artifacts: ReportArtifacts) -> Repo
         *[finding.summary for finding in report.executive_findings],
         *report.limitations,
     ]
+    research_design = report.research_design
+    target_population_summary = ""
+    sampling_frame_summary = ""
+    segmentation_plan_summary = ""
+    analysis_plan_summary = ""
+    qualitative_coding_summary = ""
+    standards_alignment_texts: list[str] = []
+    benchmark_wording_texts: list[str] = []
+    if research_design is not None:
+        target_population_summary = "; ".join(
+            [
+                ", ".join(research_design.target_population_definition.inclusion_rules),
+                research_design.target_population_definition.unit_of_analysis,
+                research_design.target_population_definition.geography,
+                research_design.target_population_definition.timeframe,
+            ]
+        ).strip("; ").strip()
+        sampling_frame_summary = research_design.sampling_or_simulation_frame.persona_generation_frame
+        segmentation_plan_summary = "; ".join(
+            [
+                ", ".join(research_design.segmentation_plan.segment_variables),
+                ", ".join(research_design.segmentation_plan.planned_cuts),
+                research_design.segmentation_plan.minimum_base_rule,
+                research_design.segmentation_plan.suppression_rule,
+            ]
+        ).strip("; ").strip()
+        analysis_plan_summary = "; ".join(
+            research_design.analysis_plan.toplines
+            + research_design.analysis_plan.cross_tabs
+            + research_design.analysis_plan.theme_coding
+            + research_design.analysis_plan.sensitivity_checks
+            + research_design.analysis_plan.benchmark_checks
+        )
+        qualitative_coding_summary = "; ".join(
+            [
+                research_design.qualitative_coding_plan.coding_mode,
+                research_design.qualitative_coding_plan.theme_granularity,
+                f"minimum themes={research_design.qualitative_coding_plan.minimum_theme_count}",
+            ]
+        )
+        standards_alignment_texts = (
+            list(research_design.standards_alignment.iso_20252)
+            + list(research_design.standards_alignment.aapor_disclosure)
+            + list(research_design.standards_alignment.icc_esomar)
+        )
+        benchmark_wording_texts = list(research_design.analysis_plan.benchmark_checks) + list(
+            research_design.disclosure_plan.data_quality_notes
+        )
     return ReportQualityInput(
         category_scores=_derive_category_scores(report, checksums),
         chart_labels=chart_labels,
@@ -381,7 +646,59 @@ def build_quality_input(report: ReportModel, artifacts: ReportArtifacts) -> Repo
                 **report.failures.classifications,
             },
         ),
+        report_depth=_derive_report_depth(report, artifacts),
+        research_design_tier=(
+            research_design.report_requirements.report_tier
+            if research_design is not None
+            else "lightweight_exploration"
+        ),
+        objective_coverage=[item.model_dump(mode="json") for item in report.objective_coverage],
+        research_objectives=list(research_design.research_objectives) if research_design else [],
+        decision_questions=list(research_design.decision_questions) if research_design else [],
+        assumptions=list(research_design.assumptions) if research_design else [],
+        target_population_summary=target_population_summary,
+        sampling_frame_summary=sampling_frame_summary,
+        segmentation_plan_summary=segmentation_plan_summary,
+        analysis_plan_summary=analysis_plan_summary,
+        qualitative_coding_summary=qualitative_coding_summary,
+        standards_alignment_texts=standards_alignment_texts,
+        benchmark_wording_texts=benchmark_wording_texts,
+        typed_answer_issues=_derive_typed_answer_issues(report),
     )
+
+
+def _derive_report_depth(report: ReportModel, artifacts: ReportArtifacts) -> ReportDepthEvidence:
+    html_text = artifacts.html_path.read_text(encoding="utf-8") if artifacts.html_path.exists() else ""
+    plain_text = re.sub(r"<[^>]+>", " ", html_text)
+    word_count = len(re.findall(r"[A-Za-z0-9']+", plain_text))
+    table_count = len(re.findall(r"<table\b", html_text, flags=re.IGNORECASE))
+    chart_count = len(artifacts.chart_paths) + len(report.analytics.population_charts)
+    segment_cut_count = sum(len(question.segment_cuts) for question in report.questions)
+    qualitative_theme_count = sum(len(question.themes) for question in report.questions)
+    traceable_quote_count = sum(
+        len(theme.supporting_quote_ids)
+        for question in report.questions
+        for theme in question.themes
+    ) + sum(len(question.quote_evidence) for question in report.questions)
+    return ReportDepthEvidence(
+        pdf_pages=_pdf_page_count(artifacts.pdf_path),
+        word_count=word_count,
+        chart_count=chart_count,
+        table_count=table_count,
+        question_count=len(report.questions),
+        segment_cut_count=segment_cut_count,
+        qualitative_theme_count=qualitative_theme_count,
+        traceable_quote_count=traceable_quote_count,
+    )
+
+
+def _pdf_page_count(path: Path) -> int:
+    if not path.exists():
+        return 0
+    try:
+        return len(PdfReader(path).pages)
+    except Exception:
+        return 0
 
 
 def _derive_category_scores(
@@ -410,10 +727,39 @@ def _derive_category_scores(
     )
 
 
+def _derive_typed_answer_issues(report: ReportModel) -> list[str]:
+    issues: list[str] = []
+    for question in report.questions:
+        if question.question_type == "choice":
+            bad_labels = [
+                label for label in question.distribution.labels if _looks_like_narrative_label(label)
+            ]
+            if bad_labels:
+                issues.append(
+                    f"{question.question_id} choice labels contain narrative text: {bad_labels[:3]}"
+                )
+        elif question.question_type == "likert":
+            if any(not re.fullmatch(r"-?\d+", label.strip()) for label in question.distribution.labels):
+                issues.append(
+                    f"{question.question_id} likert labels must be integers: {question.distribution.labels[:5]}"
+                )
+        elif (
+            report.research_design is not None
+            and report.research_design.requires_professional_quality_gate()
+            and any(_looks_like_narrative_label(theme.label) for theme in question.themes)
+        ):
+            issues.append(
+                f"{question.question_id} professional qualitative themes are still verbatim response variants"
+            )
+    return issues
+
+
 def _derive_sections_present(report: ReportModel) -> list[str]:
     sections = ["title", "executive_summary", "question_results", "attrition", "limitations", "provenance", "appendix"]
     if report.methodology is not None:
         sections.append("methodology")
+    if report.research_design is not None:
+        sections.extend(["research_design", "objective_coverage", "standards_alignment_appendix"])
     return sections
 
 
@@ -437,6 +783,7 @@ def _expected_artifact_pairs(
     return [
         (path, checksums.get(path.name, ""))
         for path in files
+        if path.exists()
     ]
 
 

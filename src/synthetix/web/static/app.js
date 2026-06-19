@@ -21,3 +21,15 @@ if (progress) {
   }
 }
 
+const chartHosts = document.querySelectorAll(".echart-host[data-chart-source]");
+if (chartHosts.length && window.echarts) {
+  for (const host of chartHosts) {
+    const sourceId = host.dataset.chartSource;
+    const source = sourceId ? document.getElementById(sourceId) : null;
+    if (!source) continue;
+    const option = JSON.parse(source.textContent || "{}");
+    const chart = window.echarts.init(host, null, { renderer: "canvas" });
+    chart.setOption(option);
+    window.addEventListener("resize", () => chart.resize());
+  }
+}

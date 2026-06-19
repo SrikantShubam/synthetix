@@ -1,0 +1,30 @@
+schema_version: "1.0"
+title: Carbon-neutral consumer trap
+purpose: Explore reactions to a certified carbon-neutral delivery subscription premium.
+population:
+  size: 5
+  seed: 20260612
+  attributes:
+    age: ["20-22", "23-25", "26-28"]
+    income: ["restricted", "entry-level"]
+  psychographics:
+    - highly cynical of corporate greenwashing
+    - demands hard supply-chain metrics
+model:
+  profile: openrouter-default
+  temperature: 0.2
+  max_output_tokens: 500
+  seed: 20260612
+questions:
+  - type: likert
+    id: premium_likelihood
+    prompt: How likely are you to pay an additional $4.50 premium per delivery if a brand displays a certified carbon-neutral badge?
+    minimum: 1
+    maximum: 5
+    minimum_label: Very unlikely
+    maximum_label: Very likely
+  - type: open_text
+    id: offset_reaction
+    prompt: What is your immediate emotional reaction when an online checkout screen prompts you to donate to offset your carbon footprint?
+limitations:
+  - This synthetic exploration has not been calibrated against human survey data.

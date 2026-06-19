@@ -84,6 +84,35 @@ REPORT_TEMPLATE = """
       </div>
     </section>
 
+    <section id="research-design" class="report-section">
+      <h2>Research design</h2>
+      <p><strong>Study type:</strong> {{ view.research_design.study_type }}</p>
+      <p><strong>Report tier:</strong> {{ view.research_design.report_tier }}</p>
+      <h3>Research objectives</h3>
+      <ul>
+      {% for item in view.research_design.objectives %}
+        <li>{{ item }}</li>
+      {% endfor %}
+      </ul>
+      <h3>Decision questions</h3>
+      <ul>
+      {% for item in view.research_design.decision_questions %}
+        <li>{{ item }}</li>
+      {% endfor %}
+      </ul>
+      <h3>Assumptions</h3>
+      <ul>
+      {% for item in view.research_design.assumptions %}
+        <li>{{ item }}</li>
+      {% endfor %}
+      </ul>
+      <p><strong>Target population:</strong> {{ view.research_design.target_population }}</p>
+      <p><strong>Simulation frame:</strong> {{ view.research_design.simulation_frame }}</p>
+      <p><strong>Segmentation plan:</strong> {{ view.research_design.segmentation_plan }}</p>
+      <p><strong>Analysis plan:</strong> {{ view.research_design.analysis_plan }}</p>
+      <p><strong>Qualitative coding plan:</strong> {{ view.research_design.qualitative_coding }}</p>
+    </section>
+
     <section id="population-composition" class="report-section">
       <h2>Population composition</h2>
       {% if view.population_summary %}
@@ -241,6 +270,27 @@ REPORT_TEMPLATE = """
       {% endif %}
     </section>
 
+    <section id="objective-coverage" class="report-section">
+      <h2>Objective coverage</h2>
+      <table class="report-table">
+        <caption>Table {{ view.objective_coverage_table_number }}. Planned objectives and delivered evidence.</caption>
+        <thead>
+          <tr><th scope="col">Objective</th><th scope="col">Decision question</th><th scope="col">Covered questions</th><th scope="col">Status</th><th scope="col">Notes</th></tr>
+        </thead>
+        <tbody>
+        {% for row in view.objective_coverage %}
+          <tr>
+            <td>{{ row.objective }}</td>
+            <td>{{ row.decision_question }}</td>
+            <td>{{ row.covered_questions }}</td>
+            <td>{{ row.status }}</td>
+            <td>{{ row.notes }}</td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </section>
+
     <section id="provenance" class="report-section">
       <h2>Provenance</h2>
       <table class="report-table">
@@ -260,6 +310,17 @@ REPORT_TEMPLATE = """
         <li>{{ item }}</li>
       {% endfor %}
       </ul>
+    </section>
+
+    <section id="standards-alignment-appendix" class="report-section">
+      <h2>Standards-aligned disclosure appendix</h2>
+      <p>{{ view.standards_alignment.summary }}</p>
+      <ul>
+      {% for item in view.standards_alignment.disclosure_items %}
+        <li>{{ item }}</li>
+      {% endfor %}
+      </ul>
+      <p><strong>Benchmark wording:</strong> {{ view.standards_alignment.benchmark_wording }}</p>
     </section>
 
     <section id="technical-appendix" class="report-section page-break">
@@ -346,6 +407,48 @@ def _coerce_text(value: Any, default: str = "") -> str:
 def _slugify(value: str) -> str:
     slug = re.sub(r"[^a-z0-9]+", "-", value.lower()).strip("-")
     return slug or "item"
+
+
+def _looks_like_narrative_label(label: str) -> bool:
+    stripped = label.strip()
+    tokens = re.findall(r"[A-Za-z0-9']+", stripped)
+    if len(tokens) > 5:
+        return True
+    if len(stripped) > 48:
+        return True
+    return any(marker in stripped for marker in (".", "!", "?", ";", ":", "\n"))
+
+
+def _chart_labels(question: Mapping[str, Any]) -> list[str]:
+    labels = [_coerce_text(label) for label in _coerce_list(question.get("labels"))]
+    question_type = _coerce_text(question.get("question_type"))
+    if question_type == "open_text" or any(_looks_like_narrative_label(label) for label in labels):
+        return [f"Response {index}" for index, _ in enumerate(labels, start=1)]
+    return labels
+
+
+def _chart_title(question: Mapping[str, Any]) -> str:
+    question_type = _coerce_text(question.get("question_type"))
+    if question_type == "open_text":
+        return "Top repeated response variants"
+    return "Response distribution"
+
+
+def _wrap_tick_label(label: str, width: int = 16) -> str:
+    words = label.split()
+    if not words:
+        return label
+    lines: list[str] = []
+    current = words[0]
+    for word in words[1:]:
+        candidate = f"{current} {word}"
+        if len(candidate) <= width:
+            current = candidate
+            continue
+        lines.append(current)
+        current = word
+    lines.append(current)
+    return "\n".join(lines)
 
 
 def _format_share(value: int, denominator: int) -> str:
@@ -439,6 +542,86 @@ def _build_executive_findings(payload: dict[str, Any]) -> list[dict[str, str]]:
     ]
 
 
+def _build_research_design(payload: dict[str, Any]) -> dict[str, Any]:
+    research_design = _coerce_mapping(payload.get("research_design"))
+    target_population = _coerce_mapping(research_design.get("target_population_definition"))
+    simulation_frame = _coerce_mapping(research_design.get("sampling_or_simulation_frame"))
+    segmentation_plan = _coerce_mapping(research_design.get("segmentation_plan"))
+    analysis_plan = _coerce_mapping(research_design.get("analysis_plan"))
+    qualitative_coding = _coerce_mapping(research_design.get("qualitative_coding_plan"))
+    return {
+        "study_type": _coerce_text(research_design.get("study_type"), "preliminary_simulation"),
+        "report_tier": _coerce_text(
+            _coerce_mapping(research_design.get("report_requirements")).get("report_tier"),
+            "lightweight_exploration",
+        ),
+        "objectives": [_coerce_text(item) for item in _coerce_list(research_design.get("research_objectives"))],
+        "decision_questions": [
+            _coerce_text(item) for item in _coerce_list(research_design.get("decision_questions"))
+        ],
+        "assumptions": [_coerce_text(item) for item in _coerce_list(research_design.get("assumptions"))],
+        "target_population": "; ".join(
+            filter(
+                None,
+                [
+                    ", ".join(_coerce_text(item) for item in _coerce_list(target_population.get("inclusion_rules"))),
+                    _coerce_text(target_population.get("unit_of_analysis")),
+                    _coerce_text(target_population.get("geography")),
+                    _coerce_text(target_population.get("timeframe")),
+                ],
+            )
+        ),
+        "simulation_frame": "; ".join(
+            filter(
+                None,
+                [
+                    _coerce_text(simulation_frame.get("persona_generation_frame")),
+                    ", ".join(_coerce_text(item) for item in _coerce_list(simulation_frame.get("quotas_or_weights"))),
+                ],
+            )
+        ),
+        "segmentation_plan": "; ".join(
+            filter(
+                None,
+                [
+                    ", ".join(_coerce_text(item) for item in _coerce_list(segmentation_plan.get("segment_variables"))),
+                    ", ".join(_coerce_text(item) for item in _coerce_list(segmentation_plan.get("planned_cuts"))),
+                    _coerce_text(segmentation_plan.get("minimum_base_rule")),
+                    _coerce_text(segmentation_plan.get("suppression_rule")),
+                ],
+            )
+        ),
+        "analysis_plan": "; ".join(
+            _coerce_text(item)
+            for key in (
+                "toplines",
+                "cross_tabs",
+                "likert_summaries",
+                "rankings",
+                "theme_coding",
+                "sensitivity_checks",
+                "benchmark_checks",
+            )
+            for item in _coerce_list(analysis_plan.get(key))
+            if _coerce_text(item)
+        ),
+        "qualitative_coding": "; ".join(
+            filter(
+                None,
+                [
+                    _coerce_text(qualitative_coding.get("coding_mode")),
+                    _coerce_text(qualitative_coding.get("theme_granularity")),
+                    (
+                        "Quote evidence required"
+                        if qualitative_coding.get("quote_evidence_required")
+                        else "Quote evidence optional"
+                    ),
+                ],
+            )
+        ),
+    }
+
+
 def _build_questions(payload: dict[str, Any]) -> list[dict[str, Any]]:
     views: list[dict[str, Any]] = []
     for index, item in enumerate(_coerce_list(payload.get("questions")), start=1):
@@ -446,23 +629,36 @@ def _build_questions(payload: dict[str, Any]) -> list[dict[str, Any]]:
         distribution = _coerce_mapping(question.get("distribution"))
         labels = [_coerce_text(label) for label in _coerce_list(distribution.get("labels"))]
         values = [_coerce_int(value) for value in _coerce_list(distribution.get("values"))]
+        chart = _coerce_mapping(question.get("chart"))
+        chart_labels = [_coerce_text(label) for label in _coerce_list(chart.get("labels"))]
+        chart_values = [_coerce_int(value) for value in _coerce_list(chart.get("values"))]
+        chart_full_labels = [_coerce_text(label) for label in _coerce_list(chart.get("full_labels"))]
         denominators = _coerce_mapping(question.get("denominators"))
         denominator = _coerce_int(denominators.get("valid_responses"), default=sum(values))
+        table_labels = labels
+        table_values = values
+        if not table_labels and chart_labels and chart_values:
+            table_labels = chart_full_labels or chart_labels
+            table_values = chart_values
         rows = [
             {
                 "label": label,
                 "value": value,
                 "share": _format_share(value, denominator),
             }
-            for label, value in zip(labels, values)
+            for label, value in zip(table_labels, table_values)
         ]
         views.append(
             {
                 "question_id": _coerce_text(question.get("question_id"), f"q{index}"),
                 "prompt": _coerce_text(question.get("prompt"), f"Question {index}"),
+                "question_type": _coerce_text(question.get("question_type"), "open_text"),
                 "denominator": denominator,
                 "labels": labels,
                 "values": values,
+                "chart_labels": chart_labels or labels,
+                "chart_values": chart_values or values,
+                "chart_family": _coerce_text(chart.get("chart_family")),
                 "rows": rows,
                 "quotes": [_coerce_text(quote) for quote in _coerce_list(question.get("quotes"))],
                 "segment_cuts": _coerce_list(question.get("segment_cuts")),
@@ -535,6 +731,45 @@ def _build_qualitative_themes(payload: dict[str, Any]) -> list[dict[str, Any]]:
     return views
 
 
+def _build_objective_coverage(payload: dict[str, Any]) -> list[dict[str, str]]:
+    rows = []
+    for item in _coerce_list(payload.get("objective_coverage")):
+        objective_row = _coerce_mapping(item)
+        rows.append(
+            {
+                "objective": _coerce_text(objective_row.get("objective")),
+                "decision_question": _coerce_text(objective_row.get("decision_question")),
+                "covered_questions": ", ".join(
+                    _coerce_text(question_id)
+                    for question_id in _coerce_list(objective_row.get("covered_question_ids"))
+                ),
+                "status": _coerce_text(objective_row.get("status")),
+                "notes": _coerce_text(objective_row.get("notes")),
+            }
+        )
+    return rows
+
+
+def _build_standards_alignment(payload: dict[str, Any]) -> dict[str, Any]:
+    research_design = _coerce_mapping(payload.get("research_design"))
+    alignment = _coerce_mapping(research_design.get("standards_alignment"))
+    disclosure = _coerce_mapping(research_design.get("disclosure_plan"))
+    analysis_plan = _coerce_mapping(research_design.get("analysis_plan"))
+    items = [
+        *_coerce_list(alignment.get("iso_20252")),
+        *_coerce_list(alignment.get("aapor_disclosure")),
+        *_coerce_list(alignment.get("icc_esomar")),
+        *_coerce_list(disclosure.get("data_quality_notes")),
+    ]
+    return {
+        "summary": "This appendix documents standards-aligned disclosure behavior only. It is not a certification claim.",
+        "disclosure_items": [_coerce_text(item) for item in items],
+        "benchmark_wording": "; ".join(
+            _coerce_text(item) for item in _coerce_list(analysis_plan.get("benchmark_checks"))
+        ),
+    }
+
+
 def _build_methodology(payload: dict[str, Any], provenance: dict[str, Any]) -> dict[str, Any]:
     methodology = _coerce_mapping(payload.get("methodology"))
     if methodology:
@@ -599,7 +834,9 @@ def _build_report_view(payload: dict[str, Any]) -> dict[str, Any]:
     segment_comparisons = _build_segment_comparisons(questions, next_table_number)
     next_table_number += len(segment_comparisons)
     failure_table_number = next_table_number
-    provenance_table_number = failure_table_number + 1
+    objective_coverage = _build_objective_coverage(payload)
+    objective_coverage_table_number = failure_table_number + 1
+    provenance_table_number = objective_coverage_table_number + 1
 
     return {
         "title": _coerce_text(payload.get("title"), "Synthetic scenario exploration"),
@@ -608,6 +845,7 @@ def _build_report_view(payload: dict[str, Any]) -> dict[str, Any]:
         "generated_at_display": _json_default(payload.get("generated_at")),
         "executive_summary": _coerce_text(payload.get("executive_summary")),
         "executive_findings": _build_executive_findings(payload),
+        "research_design": _build_research_design(payload),
         "population_summary": population_summary,
         "population_rows": population_rows,
         "population_table_number": 1,
@@ -627,11 +865,14 @@ def _build_report_view(payload: dict[str, Any]) -> dict[str, Any]:
             for item in _coerce_list(payload.get("sensitivity_notes"))
         ],
         "methodology": _build_methodology(payload, provenance),
+        "objective_coverage": objective_coverage,
+        "objective_coverage_table_number": objective_coverage_table_number,
         "provenance_rows": _build_provenance_rows(provenance),
         "provenance_table_number": provenance_table_number,
         "token_usage": _coerce_int(payload.get("token_usage")),
         "cost_usd": _coerce_float(payload.get("cost_usd")),
         "limitations": [_coerce_text(item) for item in _coerce_list(payload.get("limitations"))],
+        "standards_alignment": _build_standards_alignment(payload),
         "manifest_json": json.dumps(
             _coerce_mapping(payload.get("manifest")),
             indent=2,
@@ -640,14 +881,17 @@ def _build_report_view(payload: dict[str, Any]) -> dict[str, Any]:
         ),
         "toc": [
             {"id": "executive-findings", "label": "Executive findings"},
+            {"id": "research-design", "label": "Research design"},
             {"id": "population-composition", "label": "Population composition"},
             {"id": "question-distributions", "label": "Question distributions"},
             {"id": "segment-comparisons", "label": "Segment comparisons"},
             {"id": "qualitative-themes", "label": "Qualitative themes and evidence"},
             {"id": "failures-sensitivity", "label": "Failures and sensitivity"},
             {"id": "methodology", "label": "Methodology"},
+            {"id": "objective-coverage", "label": "Objective coverage"},
             {"id": "provenance", "label": "Provenance"},
             {"id": "limitations", "label": "Limitations"},
+            {"id": "standards-alignment-appendix", "label": "Standards-aligned disclosure appendix"},
             {"id": "technical-appendix", "label": "Technical appendix"},
         ],
     }
@@ -656,32 +900,56 @@ def _build_report_view(payload: dict[str, Any]) -> dict[str, Any]:
 def _render_charts(questions: list[dict[str, Any]], output_dir: Path) -> list[Path]:
     files: list[Path] = []
     for question in questions:
-        if not question["labels"]:
+        if not question["chart_labels"]:
             question["chart_path"] = ""
             continue
+        chart_question = {
+            "question_type": question.get("question_type"),
+            "labels": question.get("chart_labels"),
+        }
+        display_labels = _chart_labels(chart_question)
+        values = [_coerce_int(value) for value in _coerce_list(question.get("chart_values"))]
         path = output_dir / f"figure-{question['figure_number']:02d}-{_slugify(question['question_id'])}.png"
-        figure, axis = plt.subplots(figsize=(7.4, 3.6), dpi=120)
+        figure, axis = plt.subplots(figsize=(8.4, 4.8), dpi=144)
         figure.patch.set_facecolor("white")
         axis.set_facecolor("white")
-        bars = axis.bar(question["labels"], question["values"], color="#1f5f78", width=0.62)
-        axis.set_title(question["prompt"], loc="left", fontsize=11, pad=12)
-        axis.set_ylabel("Synthetic responses", fontsize=9)
+        wrapped_labels = [_wrap_tick_label(label) for label in display_labels]
+        chart_family = _coerce_text(question.get("chart_family"))
+        if chart_family == "question_themes":
+            bars = axis.barh(wrapped_labels, values, color="#1f5f78", height=0.62)
+            axis.set_xlabel("Theme mentions", fontsize=9)
+        else:
+            bars = axis.bar(wrapped_labels, values, color="#1f5f78", width=0.62)
+            axis.set_ylabel("Synthetic responses", fontsize=9)
+        axis.set_title(_chart_title(question), loc="left", fontsize=11, pad=12)
         axis.yaxis.set_major_locator(MaxNLocator(integer=True))
         axis.grid(axis="y", color="#d7dee3", linewidth=0.8)
         axis.set_axisbelow(True)
         for spine in ("top", "right"):
             axis.spines[spine].set_visible(False)
-        for bar, value in zip(bars, question["values"]):
-            axis.text(
-                bar.get_x() + bar.get_width() / 2,
-                bar.get_height() + 0.03,
-                str(value),
-                ha="center",
-                va="bottom",
-                fontsize=8,
-                color="#102a43",
-            )
-        axis.tick_params(axis="x", labelrotation=0, labelsize=8)
+        axis.margins(x=0.05)
+        for bar, value in zip(bars, values):
+            if chart_family == "question_themes":
+                axis.text(
+                    bar.get_width() + 0.03,
+                    bar.get_y() + bar.get_height() / 2,
+                    str(value),
+                    ha="left",
+                    va="center",
+                    fontsize=8,
+                    color="#102a43",
+                )
+            else:
+                axis.text(
+                    bar.get_x() + bar.get_width() / 2,
+                    bar.get_height() + 0.03,
+                    str(value),
+                    ha="center",
+                    va="bottom",
+                    fontsize=8,
+                    color="#102a43",
+                )
+        axis.tick_params(axis="x", labelrotation=0, labelsize=8, pad=8)
         axis.tick_params(axis="y", labelsize=8)
         figure.tight_layout()
         figure.savefig(path, metadata={"Software": "Synthetix"}, dpi=120)

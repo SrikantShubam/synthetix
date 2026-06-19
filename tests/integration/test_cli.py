@@ -27,6 +27,94 @@ questions:
     assert "valid" in result.stdout.lower()
 
 
+def test_cli_validate_fails_for_professional_question_quality_error(tmp_path: Path) -> None:
+    path = tmp_path / "bad-survey.yaml"
+    path.write_text(
+        """
+title: Bad pricing survey
+purpose: Assess pricing.
+population:
+  size: 2
+  seed: 1
+questions:
+  - type: choice
+    id: q1
+    prompt: "Do you feel the value proposition of the new sandwich at $9.49 is fair?"
+    options: ["Yes", "No"]
+research_design:
+  study_type: concept_test
+  research_objectives: [Measure fit]
+  decision_questions: ["Should the concept proceed?"]
+  assumptions: [Synthetic only]
+  target_population_definition:
+    inclusion_rules: [Adults]
+    exclusion_rules: [None]
+    geography: US
+    timeframe: Current
+    unit_of_analysis: Decision-maker
+  sampling_or_simulation_frame:
+    persona_generation_frame: Declared attribute grid
+    quotas_or_weights: [No weighting]
+    uncovered_groups: [Undeclared]
+  segmentation_plan:
+    segment_variables: [region]
+    planned_cuts: [region]
+    minimum_base_rule: Suppress cuts below n=2
+    suppression_rule: Mark suppressed cuts
+  question_role_map:
+    q1: primary_outcome
+  analysis_plan:
+    toplines: [Primary topline]
+    cross_tabs: [By region]
+    likert_summaries: []
+    rankings: []
+    theme_coding: []
+    sensitivity_checks: [Review invalid attempts]
+    benchmark_checks: [Use selected metric pass rate wording only]
+  qualitative_coding_plan:
+    coding_mode: deterministic
+    theme_granularity: Barrier themes
+    quote_evidence_required: true
+    minimum_theme_count: 1
+  report_requirements:
+    report_tier: professional
+    required_sections: [research_design, objective_coverage, standards_alignment_appendix]
+    minimum_figures: 1
+    minimum_tables: 2
+    appendix_requirements: [Planned-vs-delivered appendix]
+    audience_level: professional
+  disclosure_plan:
+    synthetic_only_warning: true
+    non_inferential_limits: true
+    model_provider_provenance: true
+    data_quality_notes: [Synthetic only]
+  standards_alignment:
+    iso_20252: [Purpose disclosure]
+    aapor_disclosure: [Questionnaire disclosure]
+    icc_esomar: [Transparency disclosure]
+""".strip(),
+        encoding="utf-8",
+    )
+
+    result = CliRunner().invoke(app, ["validate", str(path)])
+
+    assert result.exit_code == 1
+    assert "choice_prompt_invites_rationale" in result.stdout
+
+
+def test_cli_validate_current_shipped_examples() -> None:
+    runner = CliRunner()
+
+    fast_food = runner.invoke(app, ["validate", "examples/fast-food-study.yaml"])
+    coffee = runner.invoke(app, ["validate", "examples/coffee.yaml"])
+    carbon = runner.invoke(app, ["validate", "examples/carbon-neutral.yaml"])
+
+    assert fast_food.exit_code == 0
+    assert coffee.exit_code == 0
+    assert carbon.exit_code == 0
+    assert "WARNING" not in carbon.stdout
+
+
 def test_cli_benchmark_loop_commands_persist_and_advance(
     tmp_path: Path, monkeypatch: MonkeyPatch
 ) -> None:
@@ -194,6 +282,11 @@ def test_cli_benchmark_predict_development_emits_predictions(tmp_path: Path) -> 
 {
   "fixture_id": "dev_fixture",
   "population_definition": {"target_sample_size": 42},
+  "prediction_contract": {
+    "metrics": [
+      {"metric_id": "overall_sample_size", "unit": "count"}
+    ]
+  },
   "actual_targets": [
     {"metric_id": "overall_sample_size", "label": "Sample size", "value": 42.0, "unit": "count"}
   ]
@@ -338,6 +431,11 @@ def test_cli_frozen_validation_workflow_generates_quality_summary(
 {
   "fixture_id": "validation_fixture",
   "population_definition": {"target_sample_size": 12},
+  "prediction_contract": {
+    "metrics": [
+      {"metric_id": "overall_sample_size", "unit": "count"}
+    ]
+  },
   "actual_targets": [
     {"metric_id": "overall_sample_size", "label": "Sample size", "value": 12.0, "tolerance": 0.0, "unit": "count"}
   ]

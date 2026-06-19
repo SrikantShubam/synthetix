@@ -33,7 +33,7 @@ class SurveyAnswers(BaseModel):
 
 class SurveyAnswer(BaseModel):
     question_id: str
-    answer: str
+    answer: str | int
 
 
 def _collapse_whitespace(value: str) -> str:
@@ -129,6 +129,100 @@ def response_schema() -> dict[str, Any]:
     }
 
 
+def response_schema_for_blueprint(blueprint: SimulationBlueprint) -> dict[str, Any]:
+    variants: list[dict[str, Any]] = []
+    for question in blueprint.questions:
+        answer_schema: dict[str, Any]
+        if isinstance(question, ChoiceQuestion):
+            answer_schema = {"type": "string", "enum": list(question.options)}
+        elif isinstance(question, LikertQuestion):
+            answer_schema = {
+                "type": "integer",
+                "minimum": question.minimum,
+                "maximum": question.maximum,
+            }
+        else:
+            answer_schema = {"type": "string", "minLength": 1}
+        variants.append(
+            {
+                "type": "object",
+                "properties": {
+                    "question_id": {"const": question.id},
+                    "answer": answer_schema,
+                },
+                "required": ["question_id", "answer"],
+                "additionalProperties": False,
+            }
+        )
+    return {
+        "type": "object",
+        "properties": {
+            "responses": {
+                "type": "array",
+                "items": {"oneOf": variants},
+            }
+        },
+        "required": ["responses"],
+        "additionalProperties": False,
+    }
+
+
+def _question_role_lines(blueprint: SimulationBlueprint) -> list[str]:
+    research_design = blueprint.research_design
+    if research_design is None:
+        return []
+    return [
+        f"{question.id}: {research_design.question_role_map.get(question.id, 'driver')}"
+        for question in blueprint.questions
+    ]
+
+
+def _answer_contract_lines(blueprint: SimulationBlueprint) -> list[str]:
+    lines: list[str] = []
+    for question in blueprint.questions:
+        if isinstance(question, ChoiceQuestion):
+            lines.append(
+                f"{question.id}: return exactly one of these options: {' | '.join(question.options)}. Do not add any explanation."
+            )
+        elif isinstance(question, LikertQuestion):
+            lines.append(
+                f"{question.id}: return an integer from {question.minimum} to {question.maximum} only. Do not add any explanation."
+            )
+        else:
+            lines.append(f"{question.id}: return a direct open-text answer.")
+    return lines
+
+
+def build_execution_user_prompt(blueprint: SimulationBlueprint) -> str:
+    questions = "\n".join(f"{question.id}: {question.prompt}" for question in blueprint.questions)
+    research_design = blueprint.research_design
+    study_context = ""
+    if research_design is not None:
+        objectives = "\n".join(f"- {objective}" for objective in research_design.research_objectives)
+        assumptions = "\n".join(f"- {assumption}" for assumption in research_design.assumptions[:4])
+        question_roles = "\n".join(f"- {line}" for line in _question_role_lines(blueprint))
+        study_context = (
+            "Study objectives:\n"
+            f"{objectives}\n"
+            "Assumptions summary:\n"
+            f"{assumptions}\n"
+            "Question roles:\n"
+            f"{question_roles}\n"
+        )
+    answer_contract = "\n".join(f"- {line}" for line in _answer_contract_lines(blueprint))
+    return (
+        f"Research purpose: {blueprint.purpose}\n"
+        f"{study_context}"
+        "Answer only as the synthetic respondent described in the system prompt.\n"
+        "Do not write methodology, analysis, or final conclusions.\n"
+        "Answer contract:\n"
+        f"{answer_contract}\n"
+        f"Questions:\n{questions}\n"
+        "Return a JSON object with a 'responses' array. Each item must contain "
+        "the exact question_id and the typed answer required by that question."
+    )
+
+
 class RunExecutor:
     def __init__(
         self,
@@ -172,9 +266,6 @@ class RunExecutor:
                     AttemptRecord(number=1, status=AttemptStatus.FAILED, error="Run cancelled")
                 ],
             )
-        questions = "\n".join(
-            f"{question.id}: {question.prompt}" for question in blueprint.questions
-        )
         profile_model = self.profile.model_id if self.profile else blueprint.model.profile
         providers = self.profile.providers if self.profile else ["test"]
         request = GatewayRequest(
@@ -184,15 +275,10 @@ class RunExecutor:
                 {"role": "system", "content": persona.prompt()},
                 {
                     "role": "user",
-                    "content": (
-                        f"Research purpose: {blueprint.purpose}\n"
-                        f"Questions:\n{questions}\n"
-                        "Return a JSON object with a 'responses' array. Each item must contain "
-                        "the exact question_id and a string answer."
-                    ),
+                    "content": build_execution_user_prompt(blueprint),
                 },
             ],
-            response_schema=response_schema(),
+            response_schema=response_schema_for_blueprint(blueprint),
             temperature=blueprint.model.temperature,
             max_tokens=blueprint.model.max_output_tokens,
             seed=blueprint.model.seed,
@@ -205,8 +291,10 @@ class RunExecutor:
                 await self._wait_for_rate_limit()
                 try:
                     response = await self.gateway.complete(request)
+                    parsed_response: dict[str, Any] | None = None
                     try:
-                        parsed = SurveyAnswers.model_validate(json.loads(response.content))
+                        parsed_response = json.loads(response.content)
+                        parsed = SurveyAnswers.model_validate(parsed_response)
                         answers = _validate_response_payload(blueprint, parsed)
                     except (json.JSONDecodeError, ValidationError) as exc:
                         attempts.append(
@@ -219,6 +307,14 @@ class RunExecutor:
                                 cost_usd=response.cost_usd,
                                 error=str(exc),
                                 raw_response=response.content,
+                                audit_payload={
+                                    "system_prompt": request.messages[0]["content"],
+                                    "user_prompt": request.messages[1]["content"],
+                                    "response_schema": request.response_schema or {},
+                                    "parsed_response": parsed_response,
+                                    "validated_answers": {},
+                                    "validation_error": str(exc),
+                                },
                             )
                         )
                         continue
@@ -233,6 +329,14 @@ class RunExecutor:
                                 cost_usd=response.cost_usd,
                                 error=str(exc),
                                 raw_response=response.content,
+                                audit_payload={
+                                    "system_prompt": request.messages[0]["content"],
+                                    "user_prompt": request.messages[1]["content"],
+                                    "response_schema": request.response_schema or {},
+                                    "parsed_response": parsed_response,
+                                    "validated_answers": {},
+                                    "validation_error": str(exc),
+                                },
                             )
                         )
                         continue
@@ -245,6 +349,14 @@ class RunExecutor:
                             output_tokens=response.output_tokens,
                             cost_usd=response.cost_usd,
                             raw_response=response.content,
+                            audit_payload={
+                                "system_prompt": request.messages[0]["content"],
+                                "user_prompt": request.messages[1]["content"],
+                                "response_schema": request.response_schema or {},
+                                "parsed_response": parsed_response,
+                                "validated_answers": answers,
+                                "validation_error": None,
+                            },
                         )
                     )
                     return RespondentResult(

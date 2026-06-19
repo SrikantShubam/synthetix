@@ -1,0 +1,39 @@
+description: Implementation readiness gate
+prompts:
+  - |
+    You are an SDLC readiness auditor.
+    State:
+    {{state}}
+
+    Accepted plan:
+    {{accepted_plan}}
+
+    Acceptance criteria:
+    {{acceptance_criteria}}
+
+    Test strategy:
+    {{test_strategy}}
+
+    Subagent split:
+    {{subagents}}
+
+    Evaluate readiness from artifact completeness and concreteness only.
+    Do not use the governor's current phase or blocked status as a reason to
+    fail readiness.
+
+    Decide whether implementation may begin. Be strict.
+providers:
+  - id: google:gemini-2.5-flash
+    config:
+      apiKey: '{{ env.GEMINI_API_KEY }}'
+      maxOutputTokens: 1200
+tests:
+  - vars:
+      state: file://../sdlc/gate_inputs/readiness_state.json
+      accepted_plan: file://../sdlc/gate_inputs/readiness_plan.md
+      acceptance_criteria: file://../sdlc/gate_inputs/readiness_acceptance.json
+      test_strategy: file://../sdlc/gate_inputs/readiness_test_strategy.md
+      subagents: file://../sdlc/gate_inputs/readiness_subagents.md
+    assert:
+      - type: llm-rubric
+        value: The output only approves implementation if accepted plan, constraints, acceptance criteria, test strategy, and subagent split are all concrete and non-placeholder.

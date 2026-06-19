@@ -1,0 +1,68 @@
+{
+  "criteria": [
+    {
+      "id": "A001",
+      "text": "Product-facing copy and reports describe outputs as synthetic simulation evidence, not representative polling or human survey results."
+    },
+    {
+      "id": "A002",
+      "text": "Unsupported benchmark domains are marked not_benchmarkable and never receive invented confidence."
+    },
+    {
+      "id": "A003",
+      "text": "Benchmark prediction payloads are generated automatically for development fixtures and missing predicted metrics fail loudly."
+    },
+    {
+      "id": "A004",
+      "text": "Professional report artifacts include report.json, report.html, report.pdf, chart assets, and checksums, with methodology, segmentation, benchmark status, limitations, and manifest appendix."
+    },
+    {
+      "id": "A005",
+      "text": "Transparent simulation dashboard exposes setup, segmentation, responses, aggregation, benchmark status, and limitations for inspection."
+    },
+    {
+      "id": "A006",
+      "text": "Validation fixtures exist before holdout readiness can be marked complete, and holdout evaluation is blocked until development and validation summaries exist."
+    },
+    {
+      "id": "A007",
+      "text": "Holdout assets remain forbidden for training, prompt tuning, few-shot examples, model selection, and self-improvement."
+    },
+    {
+      "id": "A008",
+      "text": "Agent orchestrator tasks include spec_id, task_id, assigned_model, allowed_paths, forbidden_paths, acceptance_checks, status, review_notes, and artifact_paths."
+    },
+    {
+      "id": "A009",
+      "text": "Future Codex/Claude work is reviewed against Gryph evidence, SDLC phase state, accepted plan, constraints, and tests."
+    },
+    {
+      "id": "A010",
+      "text": "Groq may be used for SDLC Promptfoo gates and explicit product fallback only when policy permits, model IDs are allowlisted, and fallback use is recorded without contaminating benchmark or holdout runs."
+    },
+    {
+      "id": "A011",
+      "text": "Professional analytics dashboards use backend-generated chart JSON with Apache ECharts, readable labels, segment support, and deterministic report/PDF chart data."
+    },
+    {
+      "id": "A012",
+      "text": "Benchmark prediction commands run successfully when actual_targets or equivalent answer-key structures are absent from prediction inputs; any code path that requires those target values to produce predictions fails acceptance."
+    },
+    {
+      "id": "A013",
+      "text": "Tests or code review checks demonstrate that prediction-time logic does not read human_reference_summary, calibration_clues, registry_summary, or equivalent benchmark-answer-bearing fields to emit predicted metrics."
+    },
+    {
+      "id": "A014",
+      "text": "When leakage is removed, development and validation benchmarks are rerun honestly and the new scores are reported as the valid baseline even if they are materially worse than prior contaminated results."
+    },
+    {
+      "id": "A015",
+      "text": "Any suspicious benchmark jump, near-perfect fixture pass, or abrupt quality increase after a code change touching predictors, fixtures, report generation, or benchmark plumbing requires explicit leakage review before the result may be treated as evidence."
+    },
+    {
+      "id": "A016",
+      "text": "Report and dashboard quality improvements must be driven by backend analytics contracts, deterministic chart data, richer aggregation logic, or presentation improvements; they must not be produced by leaking expected benchmark answers or by using raw answer-bearing text as chart labels."
+    }
+  ]
+}

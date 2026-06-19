@@ -1,0 +1,152 @@
+models:
+  gpt-5.4:
+    role: "senior_planner_policy_reviewer_final_reviewer"
+    purpose: "Own high-judgment work: product positioning, scientific boundary, benchmark/holdout governance, architecture decisions, final review, and SDLC gate decisions."
+    owns_tasks:
+      - "Extract and maintain non-negotiable constraints in sdlc/constraints.json."
+      - "Create or approve accepted plans in sdlc/plans/accepted_plan.md."
+      - "Review plan diffs for dropped constraints or changed assumptions."
+      - "Review scientific-boundary language in product, report, benchmark, and UI changes."
+      - "Approve benchmark/holdout governance changes."
+      - "Review final compliance using Gryph evidence and test results."
+      - "Decide whether GPT-5.4-mini output is safe to merge or needs rework."
+    allowed_paths:
+      - "AGENTS.md"
+      - "CLAUDE.md"
+      - "goals.md"
+      - "docs/specs/**"
+      - "docs/protocols/**"
+      - "docs/operations/**"
+      - "docs/progress/**"
+      - "sdlc/**"
+      - "evals/**"
+      - "src/synthetix/**"
+      - "tests/**"
+      - "research/benchmark_program/validation/**"
+    forbidden_paths:
+      - "research/source_of_truth/**"
+      - "data/benchmark-results/holdout/**"
+    may_edit_code: true
+    code_edit_rule: "Only for high-judgment policy, orchestration, benchmark governance, report semantics, or review fixes. Prefer delegating bounded plumbing to gpt-5.4-mini."
+
+  gpt-5.4-mini:
+    role: "bounded_implementer_test_writer_plumbing_agent"
+    purpose: "Own scoped implementation, tests, fixtures, CLI plumbing, deterministic data contracts, and small refactors after GPT-5.4 has accepted the plan."
+    owns_tasks:
+      - "Implement accepted plans with narrow file scope."
+      - "Write or update unit tests from sdlc/qa/acceptance_criteria.json."
+      - "Maintain benchmark prediction payload plumbing when contracts are already defined."
+      - "Run targeted verification commands and report results."
+      - "Update low-risk progress notes after checks pass."
+      - "Regenerate SDLC context after implementation using the governor commands."
+    allowed_paths:
+      - "src/synthetix/**"
+      - "tests/**"
+      - "examples/**"
+      - "sdlc/context/**"
+      - "sdlc/gryph_summary.json"
+      - "docs/progress/**"
+      - "data/benchmark-predictions/**"
+    forbidden_paths:
+      - "research/source_of_truth/**"
+      - "data/benchmark-results/holdout/**"
+      - "goals.md"
+      - "docs/protocols/scientific-boundary.md"
+      - "docs/operations/security.md"
+      - "sdlc/constraints.json"
+      - "sdlc/plans/accepted_plan.md"
+    may_edit_code: true
+    code_edit_rule: "Do not change product positioning, scientific claims, benchmark policy, holdout policy, provider fallback policy, or security rules."
+
+task_routing:
+  product_positioning:
+    owner: "gpt-5.4"
+    reason: "Requires careful scientific and user-facing claim boundaries."
+  scientific_boundary:
+    owner: "gpt-5.4"
+    reason: "High risk if synthetic outputs are overstated."
+  benchmark_threshold_policy:
+    owner: "gpt-5.4"
+    reason: "Unsupported domains and confidence language must stay conservative."
+  holdout_readiness:
+    owner: "gpt-5.4"
+    reason: "Holdout/source-of-truth contamination is a hard governance risk."
+  final_review:
+    owner: "gpt-5.4"
+    reason: "Final approval must compare plan, constraints, tests, and Gryph evidence."
+  architecture_change:
+    owner: "gpt-5.4"
+    reason: "Architecture changes can violate the modular monolith constraint."
+  report_semantics:
+    owner: "gpt-5.4"
+    reason: "Report language must avoid representative survey claims."
+  orchestrator_policy:
+    owner: "gpt-5.4"
+    reason: "Agent model routing and forbidden paths are governance decisions."
+  cli_plumbing:
+    owner: "gpt-5.4-mini"
+    reviewer: "gpt-5.4"
+    reason: "Implementation is bounded once the contract is defined."
+  deterministic_data_contract:
+    owner: "gpt-5.4-mini"
+    reviewer: "gpt-5.4"
+    reason: "Mini can implement schemas/tests; GPT-5.4 reviews policy impact."
+  unit_tests:
+    owner: "gpt-5.4-mini"
+    reviewer: "gpt-5.4"
+    reason: "Test writing is bounded by accepted criteria."
+  bugfix_with_known_root_cause:
+    owner: "gpt-5.4-mini"
+    reviewer: "gpt-5.4"
+    reason: "Mini can fix narrow defects after root cause is documented."
+  benchmark_prediction_plumbing:
+    owner: "gpt-5.4-mini"
+    reviewer: "gpt-5.4"
+    reason: "Mini can emit/score payloads; GPT-5.4 checks benchmark policy."
+  dashboard_ui_plumbing:
+    owner: "gpt-5.4-mini"
+    reviewer: "gpt-5.4"
+    reason: "Mini can implement inspectable UI views after copy/claims are constrained."
+
+workflow:
+  planning:
+    owner: "gpt-5.4"
+    output_required:
+      - "sdlc/plans/accepted_plan.md"
+      - "sdlc/constraints.json"
+      - "sdlc/qa/acceptance_criteria.json"
+      - "sdlc/qa/test_strategy.md"
+  implementation:
+    owner: "gpt-5.4-mini"
+    entry_conditions:
+      - "current_phase is implementation"
+      - "accepted plan exists"
+      - "constraints exist"
+      - "acceptance criteria exist"
+      - "test strategy exists"
+      - "readiness gate passed or explicit user override exists"
+    output_required:
+      - "code changes scoped to allowed paths"
+      - "targeted tests"
+      - "verification output"
+      - "Gryph evidence ingested"
+      - "dynamic context regenerated"
+  review:
+    owner: "gpt-5.4"
+    input_required:
+      - "accepted plan"
+      - "constraints"
+      - "test strategy"
+      - "Gryph summary"
+      - "test output"
+    output_required:
+      - "go/no-go decision"
+      - "constraint regressions, if any"
+      - "required fixes, if any"
+
+hard_rules:
+  - "GPT-5.4-mini must not edit holdout/source-of-truth paths."
+  - "GPT-5.4-mini must not change scientific-boundary, security, or product-positioning policy files."
+  - "GPT-5.4 owns all decisions that can affect external claims, benchmark governance, model/provider policy, or holdout readiness."
+  - "No model may claim implementation success without verification evidence."
+  - "No model may manually invent audit history; Gryph evidence must be ingested when available."

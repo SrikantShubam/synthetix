@@ -1,0 +1,110 @@
+schema_version: "1.0"
+title: Carbon-neutral checkout prompt simulation
+purpose: Explore likely synthetic reactions to a carbon-neutral donation prompt before running a real customer survey.
+research_design:
+  study_type: preliminary_simulation
+  research_objectives:
+    - Identify likely reaction patterns to a checkout donation prompt.
+    - Detect segment differences that may need human-survey validation.
+    - Find ambiguous or leading survey questions before fieldwork.
+  decision_questions:
+    - Should the concept advance to a human pilot survey?
+    - Which customer segments need separate analysis?
+    - Which questionnaire items need rewriting before fieldwork?
+  assumptions:
+    population:
+      - Synthetic personas approximate declared segment profiles only.
+    context:
+      - Checkout prompts may trigger skepticism about corporate responsibility.
+    behavior:
+      - Stated willingness in simulation is not a purchase or donation forecast.
+    model_limits:
+      - Results can change with model, seed, provider, and prompt wording.
+  target_population_definition:
+    unit_of_analysis: synthetic ecommerce customer persona
+    inclusion_rules:
+      - Adult online shoppers.
+      - Familiar with food delivery or ecommerce checkout.
+    exclusion_rules:
+      - No claim of representative national consumer coverage.
+  sampling_or_simulation_frame:
+    method: quota-style synthetic persona generation
+    quotas:
+      region: [urban, suburban, rural]
+      climate_attitude: [high_concern, mixed, skeptical]
+    weighting: none
+  segmentation_plan:
+    required_variables: [region, climate_attitude]
+    planned_cuts:
+      - region by response distribution
+      - climate_attitude by willingness to pay
+      - climate_attitude by open-text theme
+    minimum_base: 2
+    suppression_rule: suppress segment estimates below minimum base and show reason
+  question_role_map:
+    offset_reaction: qualitative_probe
+    premium_likelihood: primary_outcome
+    trust_driver: driver
+  analysis_plan:
+    toplines:
+      - response distribution for premium_likelihood
+    cross_tabs:
+      - premium_likelihood by region
+      - premium_likelihood by climate_attitude
+    qualitative:
+      - theme counts for offset_reaction
+      - representative synthetic quote evidence by theme
+    sensitivity_checks:
+      - rerun with a different seed before external claims
+    benchmark_checks:
+      - mark unsupported domains as not_benchmarkable
+  qualitative_coding_plan:
+    coding_mode: deterministic_theme_grouping
+    theme_granularity: concise consumer reaction themes
+    minimum_themes: 3
+    minimum_traceable_quotes: 6
+  report_requirements:
+    tier: professional
+    required_sections:
+      - executive summary
+      - research objectives
+      - assumptions
+      - methodology
+      - population and segmentation
+      - question results
+      - qualitative themes
+      - limitations
+      - standards-alignment disclosure appendix
+    minimum_charts: 6
+    minimum_tables: 8
+  disclosure_plan:
+    warning: Synthetic scenario evidence only. Do not infer prevalence, causality, statistical significance, or human survey replacement.
+    provenance_required: true
+    selected_metric_pass_rate_explanation_required: true
+  standards_alignment:
+    - iso_20252
+    - aapor_disclosure
+    - icc_esomar
+population:
+  size: 12
+  seed: 42
+  attributes:
+    region: [urban, suburban, rural]
+    climate_attitude: [high_concern, mixed, skeptical]
+model:
+  profile: openrouter-default
+  temperature: 0.2
+questions:
+  - type: open_text
+    id: offset_reaction
+    prompt: What is your immediate emotional reaction when checkout asks you to donate to offset your carbon footprint?
+  - type: choice
+    id: premium_likelihood
+    prompt: How likely are you to pay an additional $4.50 for carbon-neutral delivery?
+    options: [Very likely, Somewhat likely, Not sure, Somewhat unlikely, Very unlikely]
+  - type: open_text
+    id: trust_driver
+    prompt: What information would make you trust or distrust the carbon-neutral claim?
+limitations:
+  - This is a synthetic pretest, not representative consumer research.
+  - Segment results require human validation before business decisions.

@@ -1,0 +1,46 @@
+{
+  "external_promptfoo_provider": "gemini",
+  "provider_fallback_order": [
+    "gemini",
+    "groq",
+    "openrouter"
+  ],
+  "approved_for_sdlc_gate_inputs": true,
+  "approved_models": [
+    "gemini-2.5-flash",
+    "llama-3.1-8b-instant",
+    "openai/gpt-4.1-mini"
+  ],
+  "allowed_files": [
+    "sdlc/gate_inputs/plan_constraints.json",
+    "sdlc/gate_inputs/previous_plan.md",
+    "sdlc/gate_inputs/candidate_plan.md",
+    "sdlc/gate_inputs/readiness_state.json",
+    "sdlc/gate_inputs/readiness_plan.md",
+    "sdlc/gate_inputs/readiness_acceptance.json",
+    "sdlc/gate_inputs/readiness_test_strategy.md",
+    "sdlc/gate_inputs/readiness_subagents.md",
+    "sdlc/gate_inputs/final_plan.md",
+    "sdlc/gate_inputs/final_constraints.json",
+    "sdlc/gate_inputs/final_context.md",
+    "sdlc/gate_inputs/final_gryph_summary.json"
+  ],
+  "never_send": [
+    ".env",
+    ".env.*",
+    "research/source_of_truth/**",
+    "data/benchmark-results/holdout/**",
+    "data/**/*.sqlite",
+    "data/**/*.db",
+    "**/*secret*",
+    "**/*key*",
+    "**/*token*"
+  ],
+  "requires_manual_approval_for": [
+    "customer data",
+    "private documents",
+    "source-of-truth holdout assets",
+    "production credentials",
+    "large raw diffs"
+  ]
+}

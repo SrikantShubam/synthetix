@@ -35,10 +35,26 @@
     "access_tier",
     "restricted_data"
   ],
+  "registry_summary": {
+    "download_permitted_entries": 0,
+    "registration_required_entries": 3
+  },
   "comparison_metric": [
     "count error",
     "restricted-source handling"
   ],
+  "prediction_contract": {
+    "metrics": [
+      {
+        "metric_id": "download_permitted_entries",
+        "unit": "count"
+      },
+      {
+        "metric_id": "registration_required_entries",
+        "unit": "count"
+      }
+    ]
+  },
   "actual_targets": [
     {
       "metric_id": "download_permitted_entries",

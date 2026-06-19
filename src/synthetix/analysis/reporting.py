@@ -7,14 +7,17 @@ from synthetix.blueprints.models import ChoiceQuestion, LikertQuestion, OpenText
 from synthetix.execution.manifest import RunManifest
 from synthetix.execution.models import AttemptStatus, RunResult
 from synthetix.reporting.models import (
+    AnalyticsChart,
     DenominatorSummary,
     Distribution,
     ExecutiveFinding,
     FailureSummary,
     MethodologySummary,
+    ObjectiveCoverage,
     ProvenanceSummary,
     QuestionReport,
     QuoteEvidence,
+    ReportAnalytics,
     ReportModel,
     SegmentComposition,
     SegmentCompositionEntry,
@@ -24,6 +27,102 @@ from synthetix.reporting.models import (
 
 MAX_QUOTES = 5
 MIN_SEGMENT_BASE = 2
+_THEME_STOPWORDS = {
+    "a",
+    "an",
+    "and",
+    "are",
+    "as",
+    "at",
+    "be",
+    "because",
+    "but",
+    "by",
+    "for",
+    "from",
+    "how",
+    "i",
+    "if",
+    "in",
+    "is",
+    "it",
+    "its",
+    "my",
+    "of",
+    "on",
+    "or",
+    "so",
+    "that",
+    "the",
+    "their",
+    "there",
+    "they",
+    "this",
+    "to",
+    "very",
+    "was",
+    "we",
+    "would",
+}
+_THEME_RULES: list[tuple[str, str, set[str]]] = [
+    (
+        "price_value",
+        "Price sensitivity and value concern",
+        {"price", "premium", "cost", "expensive", "value", "worth", "afford", "budget", "payback"},
+    ),
+    (
+        "trust_credibility",
+        "Trust and credibility concern",
+        {"trust", "credible", "credibility", "real", "prove", "proof", "skeptic", "suspicious"},
+    ),
+    (
+        "training_onboarding",
+        "Training and onboarding friction",
+        {"training", "onboarding", "learn", "learning", "setup", "effort", "workflow"},
+    ),
+    (
+        "quality_taste",
+        "Taste and product quality uncertainty",
+        {"taste", "flavor", "quality", "portion", "quality-focused"},
+    ),
+    (
+        "convenience_fit",
+        "Convenience and workflow fit",
+        {"convenience", "fit", "faster", "quick", "workflow", "slot", "easier"},
+    ),
+    (
+        "competitive_alternatives",
+        "Competitive price comparison",
+        {"local", "alternative", "alternatives", "cheaper", "compare", "comparison"},
+    ),
+    (
+        "impact_responsibility",
+        "Impact and responsibility skepticism",
+        {"offset", "carbon", "greenwashing", "responsibility", "consumer", "impact", "badge"},
+    ),
+    (
+        "questionnaire_clarity",
+        "Question wording clarity issue",
+        {
+            "word",
+            "wording",
+            "question",
+            "questions",
+            "clear",
+            "clarity",
+            "unclear",
+            "leading",
+            "option",
+            "options",
+            "feedback",
+            "separate",
+            "ask",
+            "whether",
+            "answer",
+            "neutral",
+        },
+    ),
+]
 
 
 def _collapse_whitespace(value: str) -> str:
@@ -34,11 +133,115 @@ def _normalized_text(value: str) -> str:
     return _collapse_whitespace(value).casefold()
 
 
+def _wrap_chart_label(value: str, width: int = 18) -> str:
+    words = value.split()
+    if not words:
+        return value
+    lines: list[str] = []
+    current = words[0]
+    for word in words[1:]:
+        candidate = f"{current} {word}"
+        if len(candidate) <= width:
+            current = candidate
+            continue
+        lines.append(current)
+        current = word
+    lines.append(current)
+    return "\n".join(lines[:3])
+
+
+def _theme_axis_label(value: str, index: int) -> str:
+    words = _collapse_whitespace(value).split()
+    compact = " ".join(words[:4]).strip(".,;:!?")
+    compact = compact[:28].rstrip()
+    if not compact:
+        compact = f"Theme {index}"
+    return f"Theme {index}: {compact}"
+
+
+def _echarts_bar_option(
+    *,
+    title: str,
+    labels: list[str],
+    values: list[int],
+    y_axis_label: str,
+    horizontal: bool = False,
+) -> dict[str, Any]:
+    category_axis = {
+        "type": "category",
+        "data": labels,
+        "axisLabel": {"interval": 0},
+    }
+    value_axis = {
+        "type": "value",
+        "name": y_axis_label,
+        "minInterval": 1,
+    }
+    return {
+        "animation": False,
+        "title": {"text": title, "left": "left"},
+        "tooltip": {"trigger": "axis"},
+        "grid": {"left": 56, "right": 24, "top": 56, "bottom": 56, "containLabel": True},
+        "xAxis": value_axis if horizontal else category_axis,
+        "yAxis": category_axis if horizontal else value_axis,
+        "series": [
+            {
+                "type": "bar",
+                "data": values,
+                "itemStyle": {"color": "#1f5f78"},
+                "barWidth": "56%",
+                "label": {"show": True, "position": "top" if not horizontal else "right"},
+            }
+        ],
+    }
+
+
 def _clean_open_text(value: Any) -> str | None:
     if value is None:
         return None
     cleaned = _collapse_whitespace(str(value))
     return cleaned or None
+
+
+def _theme_tokens(value: str) -> list[str]:
+    tokens = []
+    for raw_token in value.casefold().replace("-", " ").split():
+        token = raw_token.strip(".,;:!?()[]{}'\"")
+        if not token or token in _THEME_STOPWORDS:
+            continue
+        if token.endswith("ing") and len(token) > 5:
+            token = token[:-3]
+        elif token.endswith("ed") and len(token) > 4:
+            token = token[:-2]
+        elif token.endswith("s") and len(token) > 4 and not token.endswith(("ss", "ness")):
+            token = token[:-1]
+        tokens.append(token)
+    return tokens
+
+
+def _theme_bucket(value: str) -> tuple[str, str]:
+    tokens = _theme_tokens(value)
+    token_set = set(tokens)
+    for bucket_id, label, markers in _THEME_RULES:
+        if token_set & markers:
+            return bucket_id, label
+    if not tokens:
+        return "general_feedback", "General feedback"
+    if len(tokens) == 1:
+        return f"emergent:{tokens[0]}", f"{tokens[0].title()} concern"
+    return (
+        f"emergent:{tokens[0]}:{tokens[1]}",
+        f"{tokens[0].title()} and {tokens[1].title()} concern",
+    )
+
+
+def _typed_quote_evidence(question_id: str, respondent: Any, answer_text: str) -> QuoteEvidence:
+    return QuoteEvidence(
+        quote_id=f"{question_id}:{respondent.persona_id}",
+        persona_id=respondent.persona_id,
+        text=answer_text,
+        attributes=respondent.attributes,
+    )
 
 
 def _canonicalize_choice(question: ChoiceQuestion, value: Any) -> str | None:
@@ -111,10 +314,10 @@ def _build_open_text_evidence(
                 attributes=respondent.attributes,
             )
         )
-        key = cleaned.casefold()
+        key, label = _theme_bucket(cleaned)
         group = theme_groups.setdefault(
             key,
-            {"label": cleaned, "supporting_quote_ids": []},
+            {"label": label, "supporting_quote_ids": []},
         )
         group["supporting_quote_ids"].append(quote_id)
 
@@ -137,45 +340,45 @@ def _build_open_text_evidence(
 def _build_choice_distribution(
     question: ChoiceQuestion,
     respondents: list[Any],
-) -> tuple[Distribution, list[str], int]:
+) -> tuple[Distribution, list[QuoteEvidence], int]:
     counts: Counter[str] = Counter()
-    valid_values: list[str] = []
+    quote_evidence: list[QuoteEvidence] = []
     for respondent in respondents:
         canonical = _canonicalize_choice(question, respondent.answers.get(question.id))
         if canonical is None:
             continue
         counts[canonical] += 1
-        valid_values.append(canonical)
+        quote_evidence.append(_typed_quote_evidence(question.id, respondent, canonical))
     return (
         Distribution(
             labels=list(question.options),
             values=[counts.get(option, 0) for option in question.options],
         ),
-        valid_values[:MAX_QUOTES],
-        len(valid_values),
+        quote_evidence,
+        len(quote_evidence),
     )
 
 
 def _build_likert_distribution(
     question: LikertQuestion,
     respondents: list[Any],
-) -> tuple[Distribution, list[str], int]:
+) -> tuple[Distribution, list[QuoteEvidence], int]:
     counts: Counter[int] = Counter()
-    valid_values: list[str] = []
+    quote_evidence: list[QuoteEvidence] = []
     for respondent in respondents:
         canonical = _canonicalize_likert(question, respondent.answers.get(question.id))
         if canonical is None:
             continue
         counts[canonical] += 1
-        valid_values.append(str(canonical))
+        quote_evidence.append(_typed_quote_evidence(question.id, respondent, str(canonical)))
     scale = list(range(question.minimum, question.maximum + 1))
     return (
         Distribution(
             labels=[str(value) for value in scale],
             values=[counts.get(value, 0) for value in scale],
         ),
-        valid_values[:MAX_QUOTES],
-        len(valid_values),
+        quote_evidence,
+        len(quote_evidence),
     )
 
 
@@ -288,47 +491,121 @@ def _build_segment_composition(
     return compositions
 
 
+def _build_population_charts(segment_composition: list[SegmentComposition]) -> list[AnalyticsChart]:
+    charts: list[AnalyticsChart] = []
+    for composition in segment_composition:
+        labels = [_wrap_chart_label(segment.value) for segment in composition.segments]
+        values = [segment.count for segment in composition.segments]
+        full_labels = [segment.value for segment in composition.segments]
+        title = f"{composition.attribute.replace('_', ' ').title()} composition"
+        charts.append(
+            AnalyticsChart(
+                chart_id=f"population:{composition.attribute}",
+                title=title,
+                chart_family="population_segment",
+                labels=labels,
+                values=values,
+                full_labels=full_labels,
+                denominator=sum(values),
+                option=_echarts_bar_option(
+                    title=title,
+                    labels=labels,
+                    values=values,
+                    y_axis_label="Synthetic respondents",
+                ),
+            )
+        )
+    return charts
+
+
+def _build_question_chart(report: QuestionReport) -> AnalyticsChart | None:
+    if report.question_type in {"choice", "likert"} and report.distribution.labels:
+        labels = [_wrap_chart_label(label) for label in report.distribution.labels]
+        values = list(report.distribution.values)
+        return AnalyticsChart(
+            chart_id=f"question:{report.question_id}",
+            title=report.prompt,
+            chart_family="question_distribution",
+            labels=labels,
+            values=values,
+            full_labels=list(report.distribution.labels),
+            denominator=report.denominators.valid_responses,
+            option=_echarts_bar_option(
+                title=report.prompt,
+                labels=labels,
+                values=values,
+                y_axis_label="Synthetic responses",
+            ),
+        )
+    if report.question_type == "open_text" and report.themes:
+        labels = [_theme_axis_label(theme.label, index) for index, theme in enumerate(report.themes, start=1)]
+        values = [theme.count for theme in report.themes]
+        full_labels = [theme.label for theme in report.themes]
+        return AnalyticsChart(
+            chart_id=f"question:{report.question_id}",
+            title=f"{report.question_id} themes",
+            chart_family="question_themes",
+            labels=labels,
+            values=values,
+            full_labels=full_labels,
+            denominator=report.denominators.valid_responses,
+            option=_echarts_bar_option(
+                title=f"{report.question_id} themes",
+                labels=labels,
+                values=values,
+                y_axis_label="Theme mentions",
+                horizontal=True,
+            ),
+        )
+    return None
+
+
 def _build_question_report(
     question: Question,
     *,
     total_personas: int,
     succeeded_respondents: list[Any],
     population_attributes: dict[str, list[str]],
+    question_role: str | None,
 ) -> QuestionReport:
     answered_respondents = _answered_respondents(question.id, succeeded_respondents)
     if question.type == "choice":
-        distribution, quotes, valid_count = _build_choice_distribution(question, answered_respondents)
+        distribution, quote_evidence, valid_count = _build_choice_distribution(question, answered_respondents)
         return QuestionReport(
             question_id=question.id,
             prompt=question.prompt,
             question_type=question.type,
+            question_role=question_role,
             response_count=valid_count,
             distribution=distribution,
-            quotes=quotes,
+            quotes=[quote.text for quote in quote_evidence[:MAX_QUOTES]],
             denominators=_build_denominators(
                 total_personas=total_personas,
                 succeeded_personas=len(succeeded_respondents),
                 answered_responses=len(answered_respondents),
                 valid_responses=valid_count,
             ),
+            quote_evidence=quote_evidence,
             segment_cuts=_build_segment_cuts(question, succeeded_respondents, population_attributes),
         )
 
     if question.type == "likert":
-        distribution, quotes, valid_count = _build_likert_distribution(question, answered_respondents)
+        distribution, quote_evidence, valid_count = _build_likert_distribution(question, answered_respondents)
         return QuestionReport(
             question_id=question.id,
             prompt=question.prompt,
             question_type=question.type,
+            question_role=question_role,
             response_count=valid_count,
             distribution=distribution,
-            quotes=quotes,
+            quotes=[quote.text for quote in quote_evidence[:MAX_QUOTES]],
             denominators=_build_denominators(
                 total_personas=total_personas,
                 succeeded_personas=len(succeeded_respondents),
                 answered_responses=len(answered_respondents),
                 valid_responses=valid_count,
             ),
+            quote_evidence=quote_evidence,
             segment_cuts=_build_segment_cuts(question, succeeded_respondents, population_attributes),
         )
 
@@ -337,6 +614,7 @@ def _build_question_report(
         question_id=question.id,
         prompt=question.prompt,
         question_type=question.type,
+        question_role=question_role,
         response_count=len(quote_evidence),
         distribution=Distribution(),
         quotes=[quote.text for quote in quote_evidence[:MAX_QUOTES]],
@@ -360,6 +638,11 @@ def _build_executive_findings(question_reports: list[QuestionReport]) -> list[Ex
             top_label, top_count = max(pairs, key=lambda pair: (pair[1], pair[0]))
             if top_count <= 0 or question.denominators.valid_responses <= 0:
                 continue
+            evidence_quote_ids = [
+                quote.quote_id
+                for quote in question.quote_evidence
+                if _normalized_text(quote.text) == _normalized_text(top_label)
+            ][:MAX_QUOTES]
             findings.append(
                 ExecutiveFinding(
                     finding_id=f"{question.question_id}-top-response",
@@ -369,6 +652,7 @@ def _build_executive_findings(question_reports: list[QuestionReport]) -> list[Ex
                         f"({top_count}/{question.denominators.valid_responses})."
                     ),
                     question_id=question.question_id,
+                    evidence_quote_ids=evidence_quote_ids,
                 )
             )
         elif question.question_type == "open_text" and question.themes:
@@ -376,16 +660,51 @@ def _build_executive_findings(question_reports: list[QuestionReport]) -> list[Ex
             findings.append(
                 ExecutiveFinding(
                     finding_id=f"{question.question_id}-theme-1",
-                    title=f"Most repeated wording for {question.question_id}",
+                    title=f"Leading theme for {question.question_id}",
                     summary=(
-                        f"The most repeated exact-response wording was '{theme.label}' "
-                        f"({theme.count} mentions)."
+                        f"The leading qualitative theme was '{theme.label}' "
+                        f"({theme.count}/{question.denominators.valid_responses})."
                     ),
                     question_id=question.question_id,
                     evidence_quote_ids=list(theme.supporting_quote_ids),
                 )
             )
     return findings[:5]
+
+
+def _build_objective_coverage(
+    blueprint: SimulationBlueprint,
+    question_reports: list[QuestionReport],
+) -> list[ObjectiveCoverage]:
+    research_design = blueprint.research_design
+    if research_design is None:
+        return []
+    primary_questions = [
+        report.question_id
+        for report in question_reports
+        if report.question_role in {"primary_outcome", "driver", "diagnostic", "qualitative_probe"}
+    ]
+    if not primary_questions:
+        primary_questions = [report.question_id for report in question_reports]
+    coverage: list[ObjectiveCoverage] = []
+    for index, objective in enumerate(research_design.research_objectives):
+        decision_question = (
+            research_design.decision_questions[index]
+            if index < len(research_design.decision_questions)
+            else None
+        )
+        coverage.append(
+            ObjectiveCoverage(
+                objective=objective,
+                decision_question=decision_question,
+                covered_question_ids=primary_questions,
+                status="covered" if primary_questions else "gap",
+                notes=(
+                    "Coverage is derived from planned primary, driver, diagnostic, and qualitative questions."
+                ),
+            )
+        )
+    return coverage
 
 
 def build_report(
@@ -404,8 +723,17 @@ def build_report(
             total_personas=len(result.respondents),
             succeeded_respondents=succeeded_respondents,
             population_attributes=blueprint.population.attributes,
+            question_role=(
+                blueprint.research_design.question_role_map.get(question.id)
+                if blueprint.research_design is not None
+                else None
+            ),
         )
         for question in blueprint.questions
+    ]
+    question_reports = [
+        report.model_copy(update={"chart": _build_question_chart(report)})
+        for report in question_reports
     ]
     failures: defaultdict[str, int] = defaultdict(int)
     retries = 0
@@ -415,6 +743,10 @@ def build_report(
             failures[respondent.status.value] += 1
     succeeded = len(succeeded_respondents)
     question_findings = _build_executive_findings(question_reports)
+    segment_composition = _build_segment_composition(
+        succeeded_respondents,
+        blueprint.population.attributes,
+    )
     return ReportModel(
         run_id=result.run_id,
         title=blueprint.title,
@@ -426,10 +758,12 @@ def build_report(
         population=blueprint.population.model_dump(mode="json"),
         questions=question_reports,
         executive_findings=question_findings,
-        segment_composition=_build_segment_composition(
-            succeeded_respondents,
-            blueprint.population.attributes,
+        segment_composition=segment_composition,
+        analytics=ReportAnalytics(
+            population_charts=_build_population_charts(segment_composition),
         ),
+        research_design=blueprint.research_design,
+        objective_coverage=_build_objective_coverage(blueprint, question_reports),
         sensitivity_notes=[
             "Small synthetic populations can overstate apparent consensus.",
             "Changing the model, provider, or seed can materially alter outputs.",
@@ -444,6 +778,7 @@ def build_report(
                 "Invalid, duplicate, unknown, and missing required answers cannot become succeeded respondents.",
                 "Question distributions are normalized by question type and shown with explicit denominators.",
                 "Open-text responses are kept as traceable evidence rather than charted as categorical distributions.",
+                "Benchmark comparisons, when present, are described as selected metric pass rates only and do not imply full paper, table, chart, wording, or report replication.",
             ],
         ),
         failures=FailureSummary(

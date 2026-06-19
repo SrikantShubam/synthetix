@@ -1,0 +1,10 @@
+{
+  "active_feature": "existing-project-sdlc-baseline",
+  "required_artifacts": {
+    "acceptance_criteria_exist": true,
+    "accepted_plan_exists": true,
+    "constraints_exist": true,
+    "subagents_exist": true,
+    "test_strategy_exists": true
+  }
+}

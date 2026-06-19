@@ -1,0 +1,74 @@
+{
+  "fixture_id": "holdout_privacy_personas_topline_v1",
+  "data_partition": "holdout",
+  "evaluation_only": true,
+  "training_allowed": false,
+  "source_reference": {
+    "paper_id": "ai_persona_privacy_decisions_2603_19791",
+    "path": "research/source_of_truth/holdout_papers/ai_persona/2603.19791_text_based_personas_privacy_decisions.pdf",
+    "sha256": "bc42582faa4da64b8f70709b75fb88ad63b62648591d8bf04f92e3533be37d33",
+    "citation": "Fawaz et al., Text-Based Personas for Simulating User Privacy Decisions, arXiv:2603.19791.",
+    "extraction_notes": "Targets are abstract-level topline metrics extracted from the frozen cycle_002 PDF. The abstract reports benchmarking across five datasets, up to 87% predictive accuracy, a 6-17 percentage point gain over a non-personalized LLM baseline, and an 80-95% reduction in prompt tokens versus in-context learning with raw examples."
+  },
+  "population_definition": {
+    "target_population": "privacy-decision survey respondents represented across five privacy-centric benchmark datasets",
+    "unit_of_analysis": "persona-conditioned privacy decision benchmark result",
+    "notes": "This fixture captures paper-reported aggregate benchmark performance only, not representative human prevalence."
+  },
+  "questionnaire_or_task": {
+    "task_type": "persona_based_privacy_decision_prediction",
+    "question_types": [
+      "binary",
+      "categorical"
+    ],
+    "notes": "Topline evaluation for text-based synthetic privacy personas grounded in prior privacy decisions."
+  },
+  "segment_variables": [
+    "dataset",
+    "persona_generation_method"
+  ],
+  "actual_targets": [
+    {
+      "metric_id": "benchmark_dataset_count",
+      "label": "Benchmark datasets evaluated",
+      "value": 5.0,
+      "tolerance": 0.0,
+      "unit": "count"
+    },
+    {
+      "metric_id": "best_persona_accuracy",
+      "label": "Best reported predictive accuracy",
+      "value": 0.87,
+      "tolerance": 0.05,
+      "unit": "ratio"
+    },
+    {
+      "metric_id": "baseline_accuracy_lift_min",
+      "label": "Minimum reported gain over non-personalized LLM baseline",
+      "value": 0.06,
+      "tolerance": 0.02,
+      "unit": "delta_ratio"
+    },
+    {
+      "metric_id": "baseline_accuracy_lift_max",
+      "label": "Maximum reported gain over non-personalized LLM baseline",
+      "value": 0.17,
+      "tolerance": 0.02,
+      "unit": "delta_ratio"
+    },
+    {
+      "metric_id": "prompt_token_reduction_min",
+      "label": "Minimum reported prompt token reduction",
+      "value": 0.8,
+      "tolerance": 0.05,
+      "unit": "ratio"
+    },
+    {
+      "metric_id": "prompt_token_reduction_max",
+      "label": "Maximum reported prompt token reduction",
+      "value": 0.95,
+      "tolerance": 0.05,
+      "unit": "ratio"
+    }
+  ]
+}

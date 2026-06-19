@@ -22,6 +22,9 @@ REQUIRED_SPEC_IDS = [
     "04-transparent-simulation-dashboard",
     "05-validation-and-holdout-readiness",
     "06-agent-orchestrator-loop",
+    "07-honest-predictor-improvement",
+    "08-rich-reporting-upgrade",
+    "09-research-design-study-plan",
 ]
 
 
@@ -70,6 +73,63 @@ def test_orchestrator_selects_first_incomplete_spec_task(tmp_path: Path) -> None
     assert task.allowed_paths == ["goals.md", "docs/specs/00-product-goals.md"]
     assert "research/source_of_truth" in task.forbidden_paths
     assert "spec_presence" in task.acceptance_checks
+
+
+def test_orchestrator_selects_first_new_packet_after_existing_specs_complete(tmp_path: Path) -> None:
+    state_path = tmp_path / "state.json"
+    state_path.write_text(
+        json.dumps(
+            {
+                "completed_specs": REQUIRED_SPEC_IDS[:7],
+                "active_task_id": None,
+                "rejected_attempts": [],
+                "accepted_artifacts": [],
+                "last_verification": None,
+            }
+        ),
+        encoding="utf-8",
+    )
+    loop = OrchestratorLoop.for_workspace(Path.cwd(), state_path=state_path)
+
+    task = loop.next_task()
+
+    assert task.spec_id == "07-honest-predictor-improvement"
+    assert task.assigned_model == AgentModel.GPT_5_4
+    assert "benchmark_comparison" in task.acceptance_checks
+    assert "unit_tests" in task.acceptance_checks
+
+
+def test_orchestrator_exposes_research_design_task_after_reporting_upgrade(tmp_path: Path) -> None:
+    state_path = tmp_path / "state.json"
+    state_path.write_text(
+        json.dumps(
+            {
+                "completed_specs": REQUIRED_SPEC_IDS[:9],
+                "active_task_id": None,
+                "rejected_attempts": [],
+                "accepted_artifacts": [],
+                "last_verification": None,
+            }
+        ),
+        encoding="utf-8",
+    )
+    loop = OrchestratorLoop.for_workspace(Path.cwd(), state_path=state_path)
+
+    task = loop.next_task()
+
+    assert task.spec_id == "09-research-design-study-plan"
+    assert task.assigned_model == AgentModel.GPT_5_4
+    assert task.acceptance_checks == [
+        "research_design_schema",
+        "study_plan_validation",
+        "standards_alignment_checklist",
+        "prompt_contract_tests",
+        "report_objective_coverage",
+        "professional_report_quality",
+        "unit_tests",
+        "integration_tests",
+        "policy_gates",
+    ]
 
 
 def test_orchestrator_rejects_holdout_paths_except_holdout_readiness() -> None:
@@ -196,3 +256,23 @@ def test_orchestrator_marks_blocked_task_status_in_state(tmp_path: Path) -> None
     assert result.blocked_task.status == TaskStatus.BLOCKED
     assert loop.state.last_verification is not None
     assert loop.state.last_verification.passed is False
+
+
+def test_orchestrator_next_task_fails_when_all_specs_are_complete(tmp_path: Path) -> None:
+    state_path = tmp_path / "state.json"
+    state_path.write_text(
+        json.dumps(
+            {
+                "completed_specs": list(REQUIRED_SPEC_IDS),
+                "active_task_id": None,
+                "rejected_attempts": [],
+                "accepted_artifacts": [],
+                "last_verification": None,
+            }
+        ),
+        encoding="utf-8",
+    )
+    loop = OrchestratorLoop.for_workspace(Path.cwd(), state_path=state_path)
+
+    with pytest.raises(ValueError, match="All specs are already complete"):
+        loop.next_task()

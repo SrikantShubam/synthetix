@@ -1,0 +1,45 @@
+# SDLC phase gates.
+# The CLI enforces the important gates; this file is readable policy for agents.
+phases:
+  intake:
+    requires: []
+  requirements:
+    requires:
+      - sdlc/context/current_task.md
+  constraints:
+    requires:
+      - sdlc/constraints.json
+  plan_alternatives:
+    requires:
+      - "at least two plan files in sdlc/plans"
+  plan_review:
+    requires:
+      - "plan diff exists in sdlc/plans/diffs"
+  accepted_plan:
+    requires:
+      - sdlc/plans/accepted_plan.md
+      - "plan constraint eval passed"
+  test_strategy:
+    requires:
+      - sdlc/qa/acceptance_criteria.json
+      - sdlc/qa/test_strategy.md
+  subagent_split:
+    requires:
+      - sdlc/subagents.yaml
+  implementation:
+    requires:
+      - sdlc/plans/accepted_plan.md
+      - sdlc/constraints.json
+      - sdlc/qa/acceptance_criteria.json
+      - sdlc/qa/test_strategy.md
+      - sdlc/subagents.yaml
+      - "implementation readiness eval passed"
+  verification:
+    requires:
+      - "tests or verification command recorded by Gryph"
+  review:
+    requires:
+      - "final compliance eval passed"
+  ship:
+    requires:
+      - "human approval"

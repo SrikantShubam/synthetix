@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     data_dir: Path = Path("data")
     database_url: str = "sqlite+aiosqlite:///./data/synthetix.db"
     openrouter_api_key: str = Field(default="", repr=False)
+    groq_api_key: str = Field(default="", repr=False)
     max_upload_bytes: int = 5_000_000
     max_pdf_pages: int = 50
     max_population: int = 500
@@ -28,4 +29,3 @@ class Settings(BaseSettings):
             max_cost_usd=self.max_cost_usd,
             max_concurrency=self.max_concurrency,
         )
-

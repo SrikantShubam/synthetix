@@ -1,0 +1,34 @@
+description: Plan constraint preservation gate
+prompts:
+  - |
+    You are an SDLC constraint auditor.
+    Active constraints:
+    {{constraints}}
+
+    Previous plan:
+    {{previous_plan}}
+
+    Candidate plan:
+    {{candidate_plan}}
+
+    Treat paraphrases and semantic equivalents as preserved constraints.
+    Do not mark a constraint as dropped when the candidate restates the same
+    requirement in different words.
+    If the previous plan and candidate plan are identical or materially identical,
+    you must report that no constraints were dropped.
+
+    Return a concise audit. Identify dropped constraints, changed requirements,
+    new assumptions, and whether the candidate can be accepted.
+providers:
+  - id: google:gemini-2.5-flash
+    config:
+      apiKey: '{{ env.GEMINI_API_KEY }}'
+      maxOutputTokens: 1200
+tests:
+  - vars:
+      constraints: file://../sdlc/gate_inputs/plan_constraints.json
+      previous_plan: file://../sdlc/gate_inputs/previous_plan.md
+      candidate_plan: file://../sdlc/gate_inputs/candidate_plan.md
+    assert:
+      - type: llm-rubric
+        value: The output says the candidate preserves every active non-negotiable constraint, or clearly lists every dropped constraint and marks the plan as not acceptable.

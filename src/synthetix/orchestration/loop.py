@@ -87,15 +87,16 @@ class OrchestratorLoop:
         if active_task_id is not None:
             return self._task_catalog()[active_task_id]
 
+        if self._all_specs_complete():
+            raise ValueError("All specs are already complete; no next task is available.")
+
         for task in self._task_catalog().values():
             if task.spec_id not in self.state.completed_specs:
                 self.validate_task_policy(task)
                 self.state.active_task_id = task.task_id
                 self._save_state()
                 return task
-        task = self._task_catalog()["06-agent-orchestrator-loop"]
-        self.validate_task_policy(task)
-        return task
+        raise ValueError("No incomplete orchestrator task is available.")
 
     def record_verification(
         self,
@@ -242,6 +243,9 @@ class OrchestratorLoop:
             "03-professional-report-pdf",
             "05-validation-and-holdout-readiness",
             "06-agent-orchestrator-loop",
+            "07-honest-predictor-improvement",
+            "08-rich-reporting-upgrade",
+            "09-research-design-study-plan",
         }
         if task.spec_id in high_judgment_specs and task.assigned_model != AgentModel.GPT_5_4:
             raise ValueError(f"Spec '{task.spec_id}' must be assigned to GPT-5.4")
@@ -293,6 +297,8 @@ class OrchestratorLoop:
             return (self.workspace / "data/benchmark-results/development/summary.json").exists()
         if check == "report_quality":
             return (self.workspace / "src/synthetix/reporting/quality.py").exists()
+        if check == "professional_report_quality":
+            return (self.workspace / "src/synthetix/reporting/quality.py").exists()
         if check == "report_artifacts":
             required = ["report.json", "report.html", "report.pdf", "checksums.json"]
             return any(
@@ -302,6 +308,18 @@ class OrchestratorLoop:
             )
         if check == "validation_evidence":
             return any((self.workspace / "research/benchmark_program/validation").glob("*.json"))
+        if check == "research_design_schema":
+            return (self.workspace / "tests/unit/test_research_design.py").exists()
+        if check == "study_plan_validation":
+            return (self.workspace / "tests/unit/test_research_design.py").exists()
+        if check == "standards_alignment_checklist":
+            return (
+                self.workspace / "docs/protocols/research-design-standards-alignment.md"
+            ).exists()
+        if check == "prompt_contract_tests":
+            return (self.workspace / "tests/unit/test_research_design.py").exists()
+        if check == "report_objective_coverage":
+            return (self.workspace / "tests/unit/test_research_design_reporting.py").exists()
         return False
 
     def _no_holdout_contamination(self, task: OrchestratorTask) -> bool:
@@ -379,5 +397,51 @@ class OrchestratorLoop:
                 allowed_paths=["src/synthetix/orchestration", "tests", "docs/specs"],
                 forbidden_paths=["research/source_of_truth", "data/benchmark-results/holdout"],
                 acceptance_checks=["unit_tests", "integration_tests", "policy_gates"],
+            ),
+            "07-honest-predictor-improvement": OrchestratorTask(
+                spec_id="07-honest-predictor-improvement",
+                task_id="07-honest-predictor-improvement",
+                title="Honest predictor improvement",
+                assigned_model=AgentModel.GPT_5_4,
+                allowed_paths=["src/synthetix", "tests", "docs/specs", "data/benchmark-predictions"],
+                forbidden_paths=["research/source_of_truth", "data/benchmark-results/holdout"],
+                acceptance_checks=["unit_tests", "integration_tests", "benchmark_comparison", "policy_gates"],
+            ),
+            "08-rich-reporting-upgrade": OrchestratorTask(
+                spec_id="08-rich-reporting-upgrade",
+                task_id="08-rich-reporting-upgrade",
+                title="Rich reporting upgrade",
+                assigned_model=AgentModel.GPT_5_4,
+                allowed_paths=["src/synthetix/reporting", "src/synthetix/analysis", "src/synthetix/web", "tests", "docs/specs"],
+                forbidden_paths=["research/source_of_truth", "data/benchmark-results/holdout"],
+                acceptance_checks=["unit_tests", "integration_tests", "report_quality", "report_artifacts", "policy_gates"],
+            ),
+            "09-research-design-study-plan": OrchestratorTask(
+                spec_id="09-research-design-study-plan",
+                task_id="09-research-design-study-plan",
+                title="Research design study plan",
+                assigned_model=AgentModel.GPT_5_4,
+                allowed_paths=[
+                    "src/synthetix/blueprints",
+                    "src/synthetix/execution",
+                    "src/synthetix/analysis",
+                    "src/synthetix/reporting",
+                    "src/synthetix/orchestration",
+                    "tests",
+                    "docs/specs/09-research-design-study-plan.md",
+                    "docs/protocols/research-design-standards-alignment.md",
+                ],
+                forbidden_paths=["research/source_of_truth", "data/benchmark-results/holdout"],
+                acceptance_checks=[
+                    "research_design_schema",
+                    "study_plan_validation",
+                    "standards_alignment_checklist",
+                    "prompt_contract_tests",
+                    "report_objective_coverage",
+                    "professional_report_quality",
+                    "unit_tests",
+                    "integration_tests",
+                    "policy_gates",
+                ],
             ),
         }

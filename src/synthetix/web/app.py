@@ -16,6 +16,7 @@ from synthetix.application import RunService
 from synthetix.ingestion.documents import DocumentLimits, UnsafeDocument, extract_document
 from synthetix.ingestion.questionnaire import parse_questionnaire
 from synthetix.ingestion.structured import parse_blueprint_text
+from synthetix.guardrails.preflight import GuardrailViolation
 from synthetix.model_gateway.openrouter import OpenRouterGateway
 from synthetix.model_gateway.profiles import DEFAULT_PROFILES
 from synthetix.reporting.models import ReportModel
@@ -100,7 +101,12 @@ def create_app(*, data_dir: Path | None = None) -> FastAPI:
             raise HTTPException(400, "Structured files must use UTF-8") from exc
         except UnsafeDocument as exc:
             raise HTTPException(400, str(exc)) from exc
-        run_id = await service.create_draft(blueprint, source_hashes=source_hashes)
+        except (ValueError, GuardrailViolation) as exc:
+            raise HTTPException(400, str(exc)) from exc
+        try:
+            run_id = await service.create_draft(blueprint, source_hashes=source_hashes)
+        except (ValueError, GuardrailViolation) as exc:
+            raise HTTPException(400, str(exc)) from exc
         return templates.TemplateResponse(
             request=request,
             name="review.html",

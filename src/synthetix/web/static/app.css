@@ -65,6 +65,11 @@ dt { font-weight: 700; } dd { margin: 0 0 12px; }
   margin-bottom: 16px;
 }
 .results-panel { padding: 18px 20px; }
+.echart-host {
+  width: 100%;
+  min-height: 320px;
+  margin: 14px 0 18px;
+}
 .results-panel-header {
   display: flex;
   justify-content: space-between;

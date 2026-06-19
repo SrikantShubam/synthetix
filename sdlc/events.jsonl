@@ -1,0 +1,67 @@
+{"timestamp": "2026-06-18T16:00:31.770496+00:00", "type": "sdlc_init"}
+{"timestamp": "2026-06-18T16:00:42.687984+00:00", "type": "context_generated"}
+{"event_count": 0, "since": "1d", "timestamp": "2026-06-18T16:04:43.006240+00:00", "type": "gryph_ingest"}
+{"timestamp": "2026-06-18T16:04:50.350272+00:00", "type": "context_generated"}
+{"event_count": 0, "since": "1d", "timestamp": "2026-06-18T16:14:01.006193+00:00", "type": "gryph_ingest"}
+{"timestamp": "2026-06-18T16:14:16.175185+00:00", "type": "context_generated"}
+{"timestamp": "2026-06-18T16:17:42.392393+00:00", "type": "context_generated"}
+{"timestamp": "2026-06-18T16:22:06.590012+00:00", "type": "context_generated"}
+{"event_count": 0, "since": "1d", "timestamp": "2026-06-18T16:22:06.677610+00:00", "type": "gryph_ingest"}
+{"timestamp": "2026-06-18T16:40:17.963818+00:00", "type": "context_generated"}
+{"timestamp": "2026-06-18T16:43:08.855241+00:00", "type": "context_generated"}
+{"event_count": 0, "since": "1d", "timestamp": "2026-06-18T16:43:08.952676+00:00", "type": "gryph_ingest"}
+{"timestamp": "2026-06-18T16:51:13.600202+00:00", "type": "context_generated"}
+{"kind": "final", "passed": false, "timestamp": "2026-06-18T16:52:34.328776+00:00", "type": "promptfoo_eval"}
+{"kind": "plan", "passed": false, "timestamp": "2026-06-18T16:52:34.474841+00:00", "type": "promptfoo_eval"}
+{"kind": "readiness", "passed": false, "timestamp": "2026-06-18T16:52:34.734481+00:00", "type": "promptfoo_eval"}
+{"kind": "readiness", "passed": false, "timestamp": "2026-06-18T17:11:40.163301+00:00", "type": "promptfoo_eval"}
+{"kind": "plan", "passed": false, "timestamp": "2026-06-18T17:11:40.213202+00:00", "type": "promptfoo_eval"}
+{"kind": "final", "passed": false, "timestamp": "2026-06-18T17:11:40.265135+00:00", "type": "promptfoo_eval"}
+{"timestamp": "2026-06-18T17:11:49.554912+00:00", "type": "context_generated"}
+{"kind": "plan", "passed": true, "timestamp": "2026-06-19T07:15:29.980031+00:00", "type": "promptfoo_eval"}
+{"kind": "plan", "passed": true, "timestamp": "2026-06-19T07:17:37.790610+00:00", "type": "promptfoo_eval"}
+{"kind": "readiness", "passed": true, "timestamp": "2026-06-19T07:18:09.319163+00:00", "type": "promptfoo_eval"}
+{"kind": "final", "passed": true, "timestamp": "2026-06-19T07:18:37.549276+00:00", "type": "promptfoo_eval"}
+{"timestamp": "2026-06-19T07:18:45.834642+00:00", "type": "context_generated"}
+{"kind": "plan", "passed": true, "timestamp": "2026-06-19T07:42:29.517477+00:00", "type": "promptfoo_eval"}
+{"kind": "final", "passed": false, "timestamp": "2026-06-19T07:43:44.847886+00:00", "type": "promptfoo_eval"}
+{"kind": "readiness", "passed": false, "timestamp": "2026-06-19T07:44:16.938403+00:00", "type": "promptfoo_eval"}
+{"kind": "plan", "passed": false, "timestamp": "2026-06-19T07:44:20.807982+00:00", "type": "promptfoo_eval"}
+{"timestamp": "2026-06-19T07:44:35.297114+00:00", "type": "context_generated"}
+{"kind": "plan", "passed": false, "timestamp": "2026-06-19T07:46:15.435852+00:00", "type": "promptfoo_eval"}
+{"kind": "final", "passed": false, "timestamp": "2026-06-19T07:46:19.592054+00:00", "type": "promptfoo_eval"}
+{"kind": "readiness", "passed": false, "timestamp": "2026-06-19T07:46:35.420771+00:00", "type": "promptfoo_eval"}
+{"timestamp": "2026-06-19T07:46:48.378807+00:00", "type": "context_generated"}
+{"timestamp": "2026-06-19T08:03:58.247683+00:00", "type": "context_generated"}
+{"kind": "plan", "passed": false, "timestamp": "2026-06-19T08:04:15.342855+00:00", "type": "promptfoo_eval"}
+{"kind": "readiness", "passed": false, "timestamp": "2026-06-19T08:05:39.489312+00:00", "type": "promptfoo_eval"}
+{"kind": "plan", "passed": false, "timestamp": "2026-06-19T08:07:20.799951+00:00", "type": "promptfoo_eval"}
+{"kind": "plan", "passed": false, "timestamp": "2026-06-19T08:08:14.867850+00:00", "type": "promptfoo_eval"}
+{"kind": "plan", "passed": false, "timestamp": "2026-06-19T08:10:16.765934+00:00", "type": "promptfoo_eval"}
+{"deterministic": true, "kind": "plan", "passed": true, "timestamp": "2026-06-19T08:14:12.587832+00:00", "type": "promptfoo_eval"}
+{"timestamp": "2026-06-19T08:21:43.182895+00:00", "type": "context_generated"}
+{"deterministic": true, "kind": "readiness", "passed": true, "timestamp": "2026-06-19T08:21:43.317747+00:00", "type": "promptfoo_eval"}
+{"forced": false, "from": "review", "timestamp": "2026-06-19T08:22:54.550607+00:00", "to": "implementation", "type": "phase_advanced"}
+{"timestamp": "2026-06-19T08:31:35.832174+00:00", "type": "context_generated"}
+{"kind": "readiness", "passed": false, "timestamp": "2026-06-19T08:33:48.456032+00:00", "type": "promptfoo_eval"}
+{"timestamp": "2026-06-19T12:58:33.029922+00:00", "type": "context_generated"}
+{"deterministic": true, "kind": "plan", "passed": true, "timestamp": "2026-06-19T13:00:36.703966+00:00", "type": "promptfoo_eval"}
+{"deterministic": true, "kind": "readiness", "passed": true, "timestamp": "2026-06-19T13:00:53.116733+00:00", "type": "promptfoo_eval"}
+{"timestamp": "2026-06-19T13:01:30.195864+00:00", "type": "context_generated"}
+{"kind": "final", "passed": false, "timestamp": "2026-06-19T13:01:44.413950+00:00", "type": "promptfoo_eval"}
+{"timestamp": "2026-06-19T13:41:16.021329+00:00", "type": "context_generated"}
+{"kind": "final", "passed": false, "timestamp": "2026-06-19T13:44:35.909463+00:00", "type": "promptfoo_eval"}
+{"timestamp": "2026-06-19T13:44:54.124313+00:00", "type": "context_generated"}
+{"timestamp": "2026-06-19T13:49:29.616282+00:00", "type": "context_generated"}
+{"timestamp": "2026-06-19T14:24:02.616486+00:00", "type": "context_generated"}
+{"kind": "final", "passed": false, "timestamp": "2026-06-19T14:45:24.714240+00:00", "type": "promptfoo_eval"}
+{"timestamp": "2026-06-19T14:45:53.261781+00:00", "type": "context_generated"}
+{"timestamp": "2026-06-19T14:55:02.226603+00:00", "type": "context_generated"}
+{"timestamp": "2026-06-19T14:56:05.844301+00:00", "type": "context_generated"}
+{"timestamp": "2026-06-19T18:03:22.838014+00:00", "type": "context_generated"}
+{"event_count": 0, "since": "1d", "timestamp": "2026-06-19T18:03:57.724416+00:00", "type": "gryph_ingest"}
+{"timestamp": "2026-06-19T18:04:09.605169+00:00", "type": "context_generated"}
+{"timestamp": "2026-06-19T18:58:44.410361+00:00", "type": "context_generated"}
+{"event_count": 0, "since": "1d", "timestamp": "2026-06-19T18:59:07.960068+00:00", "type": "gryph_ingest"}
+{"event_count": 0, "since": "1d", "timestamp": "2026-06-19T19:24:28.153144+00:00", "type": "gryph_ingest"}
+{"timestamp": "2026-06-19T19:24:35.624924+00:00", "type": "context_generated"}

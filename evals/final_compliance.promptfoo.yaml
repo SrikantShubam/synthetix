@@ -1,0 +1,31 @@
+description: Final compliance gate
+prompts:
+  - |
+    You are a senior review agent.
+    Accepted plan:
+    {{accepted_plan}}
+
+    Constraints:
+    {{constraints}}
+
+    Dynamic context:
+    {{dynamic_context}}
+
+    Gryph summary:
+    {{gryph_summary}}
+
+    Decide whether the implementation is compliant. List gaps first.
+providers:
+  - id: google:gemini-2.5-flash
+    config:
+      apiKey: '{{ env.GEMINI_API_KEY }}'
+      maxOutputTokens: 1200
+tests:
+  - vars:
+      accepted_plan: file://../sdlc/gate_inputs/final_plan.md
+      constraints: file://../sdlc/gate_inputs/final_constraints.json
+      dynamic_context: file://../sdlc/gate_inputs/final_context.md
+      gryph_summary: file://../sdlc/gate_inputs/final_gryph_summary.json
+    assert:
+      - type: llm-rubric
+        value: The output checks implementation evidence against the accepted plan and active constraints, and does not approve if verification evidence is missing.

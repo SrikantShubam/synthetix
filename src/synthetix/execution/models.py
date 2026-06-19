@@ -62,6 +62,7 @@ class AttemptRecord(BaseModel):
     cost_usd: float = 0
     error: str | None = None
     raw_response: str | None = None
+    audit_payload: dict[str, Any] = Field(default_factory=dict)
 
 
 class RespondentResult(BaseModel):
@@ -86,4 +87,3 @@ class RunResult(BaseModel):
             for respondent in self.respondents
             for attempt in respondent.attempts
         )
-

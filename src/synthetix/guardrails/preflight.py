@@ -5,6 +5,7 @@ import math
 from pydantic import BaseModel, Field
 
 from synthetix.blueprints.models import SimulationBlueprint
+from synthetix.guardrails.question_quality import assess_question_quality, question_quality_errors
 from synthetix.model_gateway.profiles import ModelProfile
 
 
@@ -42,6 +43,12 @@ def estimate_run(
     profile: ModelProfile,
     limits: GuardrailLimits,
 ) -> PreflightEstimate:
+    quality_errors = question_quality_errors(blueprint)
+    if quality_errors:
+        raise GuardrailViolation(
+            "Question quality guardrails failed: "
+            + "; ".join(f"{finding.question_id}: {finding.message}" for finding in quality_errors)
+        )
     if blueprint.population.size > limits.max_population:
         raise GuardrailViolation("Population exceeds configured limit")
     projected_calls = blueprint.population.size
@@ -72,6 +79,11 @@ def estimate_run(
         "Synthetic outputs do not estimate real population prevalence.",
         "Uploaded content will be transmitted to an external provider after approval.",
     ]
+    warnings.extend(
+        f"{finding.code}: {finding.message}"
+        for finding in assess_question_quality(blueprint)
+        if finding.severity == "warning"
+    )
     return PreflightEstimate(
         projected_calls=projected_calls,
         estimated_input_tokens=estimated_input,
@@ -80,4 +92,3 @@ def estimate_run(
         max_cost_usd=max_cost,
         warnings=warnings,
     )
-

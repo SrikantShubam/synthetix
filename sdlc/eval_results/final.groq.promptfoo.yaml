@@ -1,0 +1,32 @@
+description: Final compliance gate
+prompts:
+  - |
+    You are a senior review agent.
+    Accepted plan:
+    {{accepted_plan}}
+
+    Constraints:
+    {{constraints}}
+
+    Dynamic context:
+    {{dynamic_context}}
+
+    Gryph summary:
+    {{gryph_summary}}
+
+    Decide whether the implementation is compliant. List gaps first.
+providers:
+  - id: openai:chat:llama-3.1-8b-instant
+    config:
+      apiBaseUrl: https://api.groq.com/openai/v1
+      apiKey: '{{ env.GROQ_API_KEY }}'
+      max_tokens: 1200
+tests:
+  - vars:
+      accepted_plan: file://C:/experiments/stimulate a and b/sdlc/gate_inputs/final_plan.md
+      constraints: file://C:/experiments/stimulate a and b/sdlc/gate_inputs/final_constraints.json
+      dynamic_context: file://C:/experiments/stimulate a and b/sdlc/gate_inputs/final_context.md
+      gryph_summary: file://C:/experiments/stimulate a and b/sdlc/gate_inputs/final_gryph_summary.json
+    assert:
+      - type: llm-rubric
+        value: The output checks implementation evidence against the accepted plan and active constraints, and does not approve if verification evidence is missing.

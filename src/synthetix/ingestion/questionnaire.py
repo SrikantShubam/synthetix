@@ -86,10 +86,11 @@ async def parse_questionnaire(
             {
                 "role": "system",
                 "content": (
-                    "Convert the questionnaire into the supplied schema. Preserve wording. "
-                    "Do not invent demographic weights. All six question arrays must have equal "
-                    "lengths. Use comma-separated choice options, empty strings for non-choice "
-                    "questions, and 1/5 as unused Likert placeholders."
+                    "Convert the questionnaire into the supplied schema. Preserve wording where it is already a clean measurement question. "
+                    "Do not invent demographic weights. All six question arrays must have equal lengths. "
+                    "Use comma-separated choice options, empty strings for non-choice questions, and 1/5 as unused Likert placeholders. "
+                    "Never create a choice or likert prompt that asks for an explanation, summary, reason, complaint, or narrative justification. "
+                    "If the source question mixes measurement and rationale, split it into a closed-ended measurement question plus a separate open_text follow-up."
                 ),
             },
             {"role": "user", "content": text},

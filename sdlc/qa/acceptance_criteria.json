@@ -1,0 +1,109 @@
+{
+  "criteria": [
+    {
+      "id": "A001",
+      "source": "goals.md, docs/specs/00-product-goals.md",
+      "text": "Product-facing copy and reports describe outputs as synthetic simulation evidence, not representative polling or human survey results."
+    },
+    {
+      "id": "A002",
+      "source": "docs/specs/01-benchmark-thresholds.md",
+      "text": "Unsupported benchmark domains are marked not_benchmarkable and never receive invented confidence."
+    },
+    {
+      "id": "A003",
+      "source": "docs/specs/02-pipeline-predicted-metrics.md",
+      "text": "Benchmark prediction payloads are generated automatically for development fixtures and missing predicted metrics fail loudly."
+    },
+    {
+      "id": "A004",
+      "source": "docs/specs/03-professional-report-pdf.md",
+      "text": "Professional report artifacts include report.json, report.html, report.pdf, chart assets, and checksums, with methodology, segmentation, benchmark status, limitations, and manifest appendix."
+    },
+    {
+      "id": "A005",
+      "source": "docs/specs/04-transparent-simulation-dashboard.md",
+      "text": "Transparent simulation dashboard exposes setup, segmentation, responses, aggregation, benchmark status, and limitations for inspection."
+    },
+    {
+      "id": "A006",
+      "source": "docs/specs/05-validation-and-holdout-readiness.md",
+      "text": "Validation fixtures exist before holdout readiness can be marked complete, and holdout evaluation is blocked until development and validation summaries exist."
+    },
+    {
+      "id": "A007",
+      "source": "goals.md, docs/specs/05-validation-and-holdout-readiness.md",
+      "text": "Holdout assets remain forbidden for training, prompt tuning, few-shot examples, model selection, and self-improvement."
+    },
+    {
+      "id": "A008",
+      "source": "docs/specs/06-agent-orchestrator-loop.md",
+      "text": "Agent orchestrator tasks include spec_id, task_id, assigned_model, allowed_paths, forbidden_paths, acceptance_checks, status, review_notes, and artifact_paths."
+    },
+    {
+      "id": "A009",
+      "source": "AGENTS.md, CLAUDE.md, tools/sdlc/sdlc.py",
+      "text": "Future Codex/Claude work is reviewed against Gryph evidence, SDLC phase state, accepted plan, constraints, and tests."
+    },
+    {
+      "id": "A010",
+      "source": "docs/specs/07-groq-fallback-and-promptfoo-gates.md",
+      "text": "Groq may be used for SDLC Promptfoo gates and explicit product fallback only when policy permits, model IDs are allowlisted, and fallback use is recorded without contaminating benchmark or holdout runs."
+    },
+    {
+      "id": "A011",
+      "source": "docs/specs/08-professional-echarts-analytics.md",
+      "text": "Professional analytics dashboards use backend-generated chart JSON with Apache ECharts, readable labels, segment support, and deterministic report/PDF chart data."
+    },
+    {
+      "id": "A012",
+      "source": "Leakage review, benchmark integrity policy",
+      "text": "Benchmark prediction commands run successfully when actual_targets or equivalent answer-key structures are absent from prediction inputs; any code path that requires those target values to produce predictions fails acceptance."
+    },
+    {
+      "id": "A013",
+      "source": "Leakage review, benchmark integrity policy",
+      "text": "Tests or code review checks demonstrate that prediction-time logic does not read human_reference_summary, calibration_clues, registry_summary, or equivalent benchmark-answer-bearing fields to emit predicted metrics."
+    },
+    {
+      "id": "A014",
+      "source": "Leakage review, benchmark integrity policy",
+      "text": "When leakage is removed, development and validation benchmarks are rerun honestly and the new scores are reported as the valid baseline even if they are materially worse than prior contaminated results."
+    },
+    {
+      "id": "A015",
+      "source": "Leakage review, benchmark integrity policy",
+      "text": "Any suspicious benchmark jump, near-perfect fixture pass, or abrupt quality increase after a code change touching predictors, fixtures, report generation, or benchmark plumbing requires explicit leakage review before the result may be treated as evidence."
+    },
+    {
+      "id": "A016",
+      "source": "Leakage review, report-quality policy",
+      "text": "Report and dashboard quality improvements must be driven by backend analytics contracts, deterministic chart data, richer aggregation logic, or presentation improvements; they must not be produced by leaking expected benchmark answers or by using raw answer-bearing text as chart labels."
+    },
+    {
+      "id": "A017",
+      "source": "docs/specs/03-professional-report-pdf.md, docs/specs/08-rich-reporting-upgrade.md, user report-quality feedback",
+      "text": "Professional report acceptance requires explicit depth evidence: at least 12 rendered PDF pages, 3000 rendered words, 6 charts or chart-backed visual summaries, 8 tables, 3 analyzed questions, 4 segment cuts, 6 qualitative themes, and 12 traceable quote references. Shallow two-page readouts must fail even when required headings and artifacts exist."
+    },
+    {
+      "id": "A018",
+      "source": "docs/specs/09-research-design-study-plan.md",
+      "text": "Every professional report maps findings back to ResearchDesign research objectives and decision questions; missing objective coverage fails acceptance."
+    },
+    {
+      "id": "A019",
+      "source": "docs/specs/09-research-design-study-plan.md, docs/protocols/research-design-standards-alignment.md",
+      "text": "Every professional report includes assumptions, target population, synthetic simulation frame, segment plan, analysis plan, qualitative coding plan, limitations, model/provider provenance, and standards-aligned disclosure appendix."
+    },
+    {
+      "id": "A020",
+      "source": "docs/specs/09-research-design-study-plan.md",
+      "text": "Benchmark scores are labeled as selected metric pass rates and must not imply full survey-paper, table, chart, wording, qualitative-code, or report replication."
+    },
+    {
+      "id": "A021",
+      "source": "docs/specs/09-research-design-study-plan.md, docs/specs/06-agent-orchestrator-loop.md",
+      "text": "The orchestrator rejects substandard study plans and report outputs, records rejection notes, and loops until research-design, report-quality, policy, unit, and integration gates pass or a hard blocker is recorded."
+    }
+  ]
+}

@@ -17,15 +17,15 @@ model:
 questions:
   - type: choice
     id: subscribe
-    prompt: Would this persona consider subscribing?
-    options: ["yes", "no"]
+    prompt: Which statement best matches this persona's subscription decision in the next month?
+    options: ["Yes", "Maybe", "No"]
   - type: likert
     id: value
-    prompt: How compelling is the value proposition?
+    prompt: How strong is the value-for-price fit for this subscription?
     minimum: 1
     maximum: 5
   - type: open_text
     id: rationale
-    prompt: Explain the primary reason for the reaction.
+    prompt: What is the primary reason behind that decision?
 limitations:
   - This concept test has not been calibrated against human reference data.

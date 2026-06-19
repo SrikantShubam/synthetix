@@ -1,0 +1,68 @@
+{
+  "fixture_id": "holdout_social_media_reactions_topline_v1",
+  "data_partition": "holdout",
+  "evaluation_only": true,
+  "training_allowed": false,
+  "source_reference": {
+    "paper_id": "social_media_reactions_2604_19787",
+    "path": "research/source_of_truth/holdout_papers/ai_persona/2604.19787_llm_agents_predict_social_media_reactions.pdf",
+    "sha256": "ae4cc09d5d31003af57d70ac85d85c93ed60ecd97005beb804449cb6d1576e79",
+    "citation": "Bojic et al., LLM Agents Predict Social Media Reactions but Do Not Outperform Text Classifiers, arXiv:2604.19787.",
+    "extraction_notes": "Targets are abstract-level topline metrics extracted from the frozen cycle_002 PDF. The abstract reports 120,000+ unique agent-persona combinations, 1,511 Serbian participants, 70.7% overall accuracy in Study 1, agent MCC of 0.29 in Study 2, and TF-IDF classifier MCC of 0.36."
+  },
+  "population_definition": {
+    "target_population": "Serbian social media users represented by 1,511 participants",
+    "unit_of_analysis": "predicted reaction of a persona-conditioned agent to a social media post",
+    "notes": "This fixture captures abstract-level predictive benchmark metrics only."
+  },
+  "questionnaire_or_task": {
+    "task_type": "social_media_reaction_prediction",
+    "question_types": [
+      "categorical",
+      "binary"
+    ],
+    "notes": "Topline evaluation over like, dislike, comment, share, and no reaction, plus binary like-dislike MCC."
+  },
+  "segment_variables": [
+    "llm_model",
+    "persona",
+    "reaction_task"
+  ],
+  "actual_targets": [
+    {
+      "metric_id": "human_participant_count",
+      "label": "Human participants",
+      "value": 1511.0,
+      "tolerance": 0.0,
+      "unit": "count"
+    },
+    {
+      "metric_id": "agent_persona_combinations",
+      "label": "Unique agent-persona combinations",
+      "value": 120000.0,
+      "tolerance": 5000.0,
+      "unit": "count"
+    },
+    {
+      "metric_id": "overall_reaction_accuracy",
+      "label": "Overall reaction prediction accuracy",
+      "value": 0.707,
+      "tolerance": 0.03,
+      "unit": "ratio"
+    },
+    {
+      "metric_id": "agent_mcc",
+      "label": "Agent Matthews Correlation Coefficient",
+      "value": 0.29,
+      "tolerance": 0.03,
+      "unit": "number"
+    },
+    {
+      "metric_id": "tfidf_classifier_mcc",
+      "label": "TF-IDF classifier Matthews Correlation Coefficient",
+      "value": 0.36,
+      "tolerance": 0.03,
+      "unit": "number"
+    }
+  ]
+}

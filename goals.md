@@ -25,6 +25,8 @@ Help students, researchers, founders, marketers, and professionals test survey a
 5. Professional reporting: generate a clear PDF with methodology, distributions, segments, themes, limitations, and provenance.
 6. Guardrailed claims: never present synthetic responses as representative polling, population prevalence, statistical significance, or causal inference.
 7. Human-survey handoff: recommend when and how to proceed to real survey work.
+8. Professional interactive analytics: produce engineer-reviewable report data and browser dashboards with readable, publication-grade charts.
+9. Controlled model resilience: keep OpenRouter as the primary research gateway, but allow a verified Groq fallback profile when the user explicitly enables fallback and the run manifest records the provider change.
 
 ## Benchmark And Ground-Truth Policy
 
@@ -35,6 +37,8 @@ Development fixtures may be used for iteration only when they do not reuse exact
 ## Report Quality Goal
 
 The final report must be easy for a consumer to understand and rigorous enough for a professional to review. It must explain the setup, population, segmentation, synthetic responses, benchmark status, limitations, and recommended next steps.
+
+Reports and dashboards must share one analytics JSON contract. The backend computes weights, aggregations, benchmark status, quality warnings, and chart-ready series; the FastAPI UI injects that JSON into Apache ECharts for interactive Canvas-rendered charts. PDF output remains deterministic and server-rendered, but it should use the same chart data and professional report structure as the dashboard.
 
 ## Non-Goals
 

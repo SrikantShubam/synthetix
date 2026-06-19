@@ -4,7 +4,13 @@ from synthetix.benchmarking.classifier import (
     BenchmarkClassifier,
     BenchmarkFamily,
 )
+from synthetix.benchmarking.fixtures import (
+    HoldoutFixtureAuthor,
+    HoldoutTargetFixture,
+    SourceReference,
+)
 from synthetix.benchmarking.loop import BenchmarkLoop, LoopState, PromptPacket
+from synthetix.benchmarking.metrics import RegistryPolicyMetricEmitter
 from synthetix.benchmarking.predictions import DevelopmentPredictionEmitter
 from synthetix.benchmarking.runtime import (
     ActualTarget,
@@ -28,9 +34,13 @@ __all__ = [
     "BenchmarkLoop",
     "ComparisonSummary",
     "DevelopmentPredictionEmitter",
+    "HoldoutFixtureAuthor",
+    "HoldoutTargetFixture",
     "LoopState",
     "MetricComparison",
     "PredictedMetric",
     "PredictedOutcome",
     "PromptPacket",
+    "RegistryPolicyMetricEmitter",
+    "SourceReference",
 ]

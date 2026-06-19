@@ -109,6 +109,7 @@ class RunRepository:
                         cost_usd=attempt.cost_usd,
                         error=attempt.error,
                         raw_response=attempt.raw_response,
+                        audit_payload=attempt.audit_payload,
                     )
                     for attempt in respondent.attempts
                 ]

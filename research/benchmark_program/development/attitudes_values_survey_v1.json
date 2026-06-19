@@ -53,6 +53,22 @@
     "segment difference preservation",
     "cultural profile alignment score"
   ],
+  "prediction_contract": {
+    "metrics": [
+      {
+        "metric_id": "cultural_configurations",
+        "unit": "count"
+      },
+      {
+        "metric_id": "value_question_count",
+        "unit": "count"
+      },
+      {
+        "metric_id": "demographic_variable_count",
+        "unit": "count"
+      }
+    ]
+  },
   "actual_targets": [
     {
       "metric_id": "cultural_configurations",

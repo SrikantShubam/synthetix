@@ -28,9 +28,11 @@ def test_freeze_creates_manifest_with_code_and_policy_hashes(tmp_path: Path) -> 
     manifest = FrozenEvaluation.for_workspace(workspace).freeze(
         split="validation",
         output_path=workspace / "data/frozen-evaluations/validation/freeze-manifest.json",
+        cycle_id="cycle_002",
     )
 
     assert manifest.split == "validation"
+    assert manifest.cycle_id == "cycle_002"
     assert manifest.status == "frozen"
     assert "research/source_of_truth/manifest.json" in manifest.artifact_hashes
     assert "research/benchmark_program/validation/fixture.json" in manifest.artifact_hashes
@@ -74,6 +76,11 @@ def test_evaluate_writes_comparison_and_quality_summary(tmp_path: Path) -> None:
         {
             "fixture_id": "validation_fixture",
             "population_definition": {"target_sample_size": 10},
+            "prediction_contract": {
+                "metrics": [
+                    {"metric_id": "overall_sample_size", "unit": "count"}
+                ]
+            },
             "actual_targets": [
                 {"metric_id": "overall_sample_size", "label": "Sample size", "value": 10, "tolerance": 0, "unit": "count"}
             ],
@@ -83,6 +90,7 @@ def test_evaluate_writes_comparison_and_quality_summary(tmp_path: Path) -> None:
     evaluator.freeze(
         split="validation",
         output_path=workspace / "data/frozen-evaluations/validation/freeze-manifest.json",
+        cycle_id="cycle_002",
     )
     evaluator.emit_predictions(
         split="validation",
@@ -97,6 +105,7 @@ def test_evaluate_writes_comparison_and_quality_summary(tmp_path: Path) -> None:
     )
 
     assert result.quality_status == "passed"
+    assert result.cycle_id == "cycle_002"
     assert result.average_score == 1.0
     assert result.min_fixture_score == 1.0
     assert (workspace / "data/benchmark-results/validation/summary.json").exists()
@@ -120,6 +129,11 @@ def test_evaluate_rejects_changed_frozen_artifacts(tmp_path: Path) -> None:
         {
             "fixture_id": "validation_fixture",
             "population_definition": {"target_sample_size": 10},
+            "prediction_contract": {
+                "metrics": [
+                    {"metric_id": "overall_sample_size", "unit": "count"}
+                ]
+            },
             "actual_targets": [
                 {"metric_id": "overall_sample_size", "label": "Sample size", "value": 10, "tolerance": 0, "unit": "count"}
             ],

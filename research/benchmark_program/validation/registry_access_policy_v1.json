@@ -34,10 +34,33 @@
     "restricted_data",
     "download_permitted"
   ],
+  "registry_summary": {
+    "registry_entry_count": 4,
+    "restricted_registry_entries": 3,
+    "public_registry_entries": 1,
+    "download_permitted_entries": 0,
+    "registration_required_entries": 3
+  },
   "comparison_metric": [
     "count error",
     "policy classification correctness"
   ],
+  "prediction_contract": {
+    "metrics": [
+      {
+        "metric_id": "registry_entry_count",
+        "unit": "count"
+      },
+      {
+        "metric_id": "restricted_registry_entries",
+        "unit": "count"
+      },
+      {
+        "metric_id": "public_registry_entries",
+        "unit": "count"
+      }
+    ]
+  },
   "actual_targets": [
     {
       "metric_id": "registry_entry_count",

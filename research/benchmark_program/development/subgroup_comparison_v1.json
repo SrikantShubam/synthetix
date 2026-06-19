@@ -54,6 +54,26 @@
     "top-gap preservation",
     "error concentration ratio by subgroup"
   ],
+  "prediction_contract": {
+    "metrics": [
+      {
+        "metric_id": "women_satisfaction_gap_vs_men",
+        "unit": "delta_ratio"
+      },
+      {
+        "metric_id": "ethnic_minority_discrimination",
+        "unit": "ratio"
+      },
+      {
+        "metric_id": "lgbtq_discrimination",
+        "unit": "ratio"
+      },
+      {
+        "metric_id": "overall_sample_size",
+        "unit": "count"
+      }
+    ]
+  },
   "calibration_clues": {
     "women_satisfaction_gap_vs_men": -0.16,
     "ethnic_minority_discrimination": 0.30,

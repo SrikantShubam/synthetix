@@ -26,3 +26,21 @@
 ## Scientific Boundary
 
 The failed frozen validation result must not be tuned against and then presented as proof. Any predictor changes after this result should be treated as a new development cycle, followed by a new validation/holdout protocol with clear provenance.
+
+## 2026-06-18 Cycle 002
+
+- Started a new development cycle after the failed frozen validation result.
+- Added deterministic registry-policy metric emission from allowed fixture metadata.
+- Added a holdout target fixture contract and authoring helper with source PDF hash validation.
+- Re-froze validation as `cycle_002`.
+- Re-ran frozen validation:
+  - split: `validation`
+  - cycle: `cycle_002`
+  - fixture count: `2`
+  - average score: `1.0`
+  - minimum fixture score: `1.0`
+  - quality status: `passed`
+  - failing fixtures: none
+- Holdout status:
+  - holdout PDFs are frozen and hashed for `cycle_002`.
+  - holdout actual-vs-predicted remains blocked until locked holdout target JSON fixtures are authored and reviewed.

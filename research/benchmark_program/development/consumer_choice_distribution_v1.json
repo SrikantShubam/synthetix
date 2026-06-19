@@ -52,6 +52,30 @@
     "distributional calibration gap",
     "largest subgroup gap preservation"
   ],
+  "prediction_contract": {
+    "metrics": [
+      {
+        "metric_id": "women_satisfaction",
+        "unit": "ratio"
+      },
+      {
+        "metric_id": "men_satisfaction",
+        "unit": "ratio"
+      },
+      {
+        "metric_id": "ethnic_minority_discrimination",
+        "unit": "ratio"
+      },
+      {
+        "metric_id": "lgbtq_discrimination",
+        "unit": "ratio"
+      },
+      {
+        "metric_id": "nordic_climate_score",
+        "unit": "likert_6"
+      }
+    ]
+  },
   "actual_targets": [
     {
       "metric_id": "women_satisfaction",

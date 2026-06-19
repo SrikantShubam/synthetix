@@ -104,6 +104,11 @@ def test_build_report_canonicalizes_choice_and_likert_answers() -> None:
     assert choice.denominators.valid_responses == 3
     assert choice.denominators.invalid_responses == 1
     assert choice.denominators.missing_responses == 1
+    assert [quote.quote_id for quote in choice.quote_evidence] == ["q_choice:p1", "q_choice:p2", "q_choice:p3"]
+    assert choice.chart is not None
+    assert choice.chart.chart_family == "question_distribution"
+    assert choice.chart.values == [2, 1]
+    assert choice.chart.option["series"][0]["data"] == [2, 1]
 
     likert = report.questions[1]
     assert likert.question_type == "likert"
@@ -113,6 +118,8 @@ def test_build_report_canonicalizes_choice_and_likert_answers() -> None:
     assert likert.denominators.answered_responses == 5
     assert likert.denominators.valid_responses == 4
     assert likert.denominators.invalid_responses == 1
+    assert likert.chart is not None
+    assert likert.chart.chart_family == "question_distribution"
 
 
 def test_build_report_uses_open_text_as_traceable_evidence() -> None:
@@ -143,9 +150,34 @@ def test_build_report_uses_open_text_as_traceable_evidence() -> None:
     ]
     assert question.quote_evidence[0].persona_id == "p1"
     assert question.quote_evidence[1].text == "need lower price"
-    assert question.themes[0].label == "Need lower price"
+    assert question.themes[0].label == "Price sensitivity and value concern"
     assert question.themes[0].count == 2
     assert question.themes[0].supporting_quote_ids == ["q_open:p1", "q_open:p2"]
+    assert question.chart is not None
+    assert question.chart.chart_family == "question_themes"
+    assert question.chart.values == [2, 1]
+    assert question.chart.labels[0].startswith("Theme 1:")
+    assert question.chart.full_labels[0] == "Price sensitivity and value concern"
+
+
+def test_build_report_links_executive_findings_to_response_evidence() -> None:
+    blueprint = _blueprint(
+        ChoiceQuestion(id="q_choice", prompt="Would you buy it?", options=["Yes", "No"]),
+        OpenTextQuestion(id="q_open", prompt="What stood out?"),
+    )
+    result = _result(
+        _respondent("p1", answers={"q_choice": "Yes", "q_open": "Need lower price"}),
+        _respondent("p2", answers={"q_choice": "Yes", "q_open": "The price feels expensive"}),
+        _respondent("p3", answers={"q_choice": "No", "q_open": "I like the convenience"}),
+    )
+
+    report = build_report(blueprint, result, _manifest(blueprint))
+
+    top_response = next(finding for finding in report.executive_findings if finding.finding_id == "q_choice-top-response")
+    top_theme = next(finding for finding in report.executive_findings if finding.finding_id == "q_open-theme-1")
+
+    assert top_response.evidence_quote_ids == ["q_choice:p1", "q_choice:p2"]
+    assert top_theme.evidence_quote_ids == ["q_open:p1", "q_open:p2"]
 
 
 def test_build_report_includes_segment_composition_and_suppressed_cuts() -> None:
@@ -179,6 +211,8 @@ def test_build_report_includes_segment_composition_and_suppressed_cuts() -> None
     assert cuts[("region", "rural")].suppressed is True
     assert cuts[("region", "rural")].distribution.labels == []
     assert cuts[("region", "rural")].base_count == 1
+    assert report.analytics.population_charts[0].chart_family == "population_segment"
+    assert report.analytics.population_charts[0].values == [2, 1]
 
 
 def test_build_report_tracks_question_denominators_and_failures() -> None:

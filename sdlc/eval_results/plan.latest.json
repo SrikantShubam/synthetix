@@ -1,0 +1,11 @@
+{
+  "command": [
+    "deterministic-plan-equality-check"
+  ],
+  "exit_code": 0,
+  "generated_at": "2026-06-19T13:00:36.701967+00:00",
+  "kind": "plan",
+  "passed": true,
+  "stderr": "",
+  "stdout": "Deterministic pass: previous_plan.md and candidate_plan.md are identical after normalization; no dropped constraints are possible."
+}
