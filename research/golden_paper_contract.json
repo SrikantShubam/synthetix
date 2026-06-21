@@ -1,0 +1,239 @@
+{
+  "contract_id": "golden_paper_contract_v1",
+  "contract_version": "1.0",
+  "status": "draft",
+  "papers": [
+    {
+      "paper_id": "digital_personas_liss_2605_10659",
+      "role": "primary",
+      "title": "When Can Digital Personas Reliably Approximate Human Survey Findings?",
+      "citation": "Jia, Chen, Sharma, Diaz-Rodriguez (2026)",
+      "public_url": "https://arxiv.org/abs/2605.10659",
+      "source_type": "public_paper"
+    },
+    {
+      "paper_id": "distributional_replication_2606_09013",
+      "role": "guardrail",
+      "title": "Beyond Averages: Evaluating LLMs on Human Survey Replication at the Distributional Level",
+      "citation": "Moon, Kim, Lah, Han, Kang (2026)",
+      "public_url": "https://arxiv.org/abs/2606.09013",
+      "source_type": "public_paper"
+    },
+    {
+      "paper_id": "simulate_multiple_humans_2208_10264",
+      "role": "foundational",
+      "title": "Using Large Language Models to Simulate Multiple Humans and Replicate Human Subject Studies",
+      "citation": "Aher, Arriaga, Kalai (2022)",
+      "public_url": "https://arxiv.org/abs/2208.10264",
+      "source_type": "public_paper"
+    },
+    {
+      "paper_id": "external_validity_privacy_security_2202_14036",
+      "role": "human_survey_ground_truth_reference",
+      "title": "How Well Do My Results Generalize Now? The External Validity of Online Privacy and Security Surveys",
+      "citation": "Waldman et al. (2022)",
+      "public_url": "https://arxiv.org/abs/2202.14036",
+      "source_type": "public_paper"
+    }
+  ],
+  "source_basis": {
+    "in_scope_claims": [
+      "Synthetic personas may be used for survey dry runs and exploratory pre-fieldwork validation.",
+      "Distribution-level alignment matters more than only mean-level agreement.",
+      "Performance depends on question stability, respondent heterogeneity, and task structure.",
+      "Human validation remains necessary for subjective, heterogeneous, and rare-response settings."
+    ],
+    "out_of_scope_claims": [
+      "Representative human prevalence claims from synthetic panels.",
+      "Statistical significance, causality, and confidence-interval claims from synthetic outputs.",
+      "Full paper, table, chart, wording, or report replication claims."
+    ],
+    "paper_findings": [
+      "Digital personas can improve distributional alignment in some domains but remain weak for individual prediction and multivariate structure.",
+      "Mean-based replication can be misleading when distributions diverge.",
+      "Aggregate replication is sometimes possible, but it does not guarantee faithful respondent-level realism."
+    ]
+  },
+  "study": {
+    "study_type": "questionnaire_dry_run",
+    "objectives": [
+      "Preview whether a survey design is likely to produce interpretable response patterns.",
+      "Validate question wording, role separation, and segment plans before fieldwork.",
+      "Surface likely synthetic barriers, themes, and chart/report limitations honestly."
+    ],
+    "decision_questions": [
+      "Is the current questionnaire ready for human fieldwork?",
+      "Which question items need rewriting before fielding?",
+      "Which segment cuts or analyses are underpowered or unsupported?"
+    ],
+    "assumptions": [
+      "Synthetic outputs are exploratory scenario evidence only.",
+      "Synthetic respondents should not be treated as sampled humans.",
+      "The pipeline must separate target population scale, source sample size, and synthetic panel size."
+    ]
+  },
+  "population": {
+    "target_population": "User-declared target population for the planned human survey.",
+    "unit_of_analysis": "Survey respondent or decision-maker defined by the study plan.",
+    "target_sample_size": null,
+    "source_sample_size": null,
+    "inclusion_rules": [
+      "Must be explicitly stated or marked unresolved."
+    ],
+    "exclusion_rules": [
+      "Must be explicitly stated or marked unresolved."
+    ],
+    "geography": "Must be explicit when applicable.",
+    "timeframe": "Must be explicit when applicable.",
+    "sampling_frame": "Must distinguish human source sample from synthetic panel construction.",
+    "weights_or_quotas": [
+      "No weighting should be implied unless explicitly provided."
+    ],
+    "uncovered_groups": [
+      "Must be disclosed when segment coverage is incomplete."
+    ]
+  },
+  "segmentation": {
+    "segment_variables": [
+      "Must come from source material or be marked missing."
+    ],
+    "planned_cuts": [
+      "Only cuts supported by the study plan should be reported."
+    ],
+    "minimum_base_rule": "Suppress small slices and state the suppression reason.",
+    "suppression_rule": "Use tables or warnings instead of unstable segment claims."
+  },
+  "question_design": {
+    "question_role_map": {
+      "required": [
+        "screening",
+        "primary_outcome",
+        "driver",
+        "diagnostic",
+        "qualitative_probe",
+        "metadata"
+      ]
+    },
+    "wording_principles": [
+      "Do not mix closed-ended measurement with rationale prompts in the same item.",
+      "Paragraph-style answer options are invalid for choice and Likert questions.",
+      "Question rationale belongs in separate open-text probes when needed."
+    ],
+    "response_scale_rules": [
+      "Closed-ended questions must use bounded categorical or numeric options.",
+      "Open-text evidence should be coded into themes rather than charted raw."
+    ],
+    "stimuli_rules": [
+      "Any source stimulus or context should be preserved or declared missing."
+    ],
+    "open_text_policy": "Use coded themes plus traceable quotes; do not treat verbatim outputs as chart labels.",
+    "skip_logic_notes": [
+      "Missing skip logic must be recorded as an unresolved gap."
+    ]
+  },
+  "analysis": {
+    "toplines": [
+      "Question-level distributions with explicit denominators."
+    ],
+    "crosstabs": [
+      "Only for planned and sufficiently supported segment variables."
+    ],
+    "likert_summaries": [
+      "Allowed when the source instrument uses bounded scales."
+    ],
+    "rankings": [],
+    "theme_coding": [
+      "Required for qualitative probes."
+    ],
+    "sensitivity_checks": [
+      "Review failed attempts, missing responses, and suppression decisions."
+    ],
+    "benchmark_checks": [
+      "Use selected metric pass rate wording only."
+    ],
+    "denominator_rules": [
+      "Every percentage or share must expose its denominator."
+    ]
+  },
+  "charts_and_report": {
+    "chart_plan": [
+      "Render charts only for supported closed-ended distributions with adequate base sizes.",
+      "Replace unsupported or open-text chart candidates with tables or evidence panels."
+    ],
+    "chart_suppression_rules": [
+      "Suppress charts for tiny base sizes, unsupported analyses, or insufficient segment coverage."
+    ],
+    "chart_replacement_rules": [
+      "Use evidence panels for open-text themes and quotes.",
+      "Use tables when a chart is not warranted but the data is still reportable."
+    ],
+    "required_sections": [
+      "research_intake",
+      "research_design",
+      "question_results",
+      "objective_coverage",
+      "fieldwork_handoff",
+      "limitations",
+      "standards_alignment_appendix"
+    ],
+    "minimum_figures": 0,
+    "minimum_tables": 0,
+    "appendix_requirements": [
+      "planned_vs_delivered",
+      "traceable_quote_evidence",
+      "provenance"
+    ]
+  },
+  "honesty": {
+    "synthetic_only_warning": true,
+    "non_inferential_limits": [
+      "Do not infer prevalence from synthetic outputs.",
+      "Do not infer causality or statistical significance from synthetic outputs.",
+      "Do not imply a small synthetic panel represents a much larger target population."
+    ],
+    "prohibited_claims": [
+      "representative human research",
+      "confidence intervals",
+      "statistical significance",
+      "causality",
+      "full survey-paper replication",
+      "full chart replication",
+      "full wording replication"
+    ],
+    "required_limitations": [
+      "Human fieldwork remains necessary.",
+      "Synthetic panels are for dry-run validation, not real-world estimation."
+    ]
+  },
+  "evaluation": {
+    "evaluation_only": true,
+    "allowed_uses": [
+      "benchmarking",
+      "evaluation",
+      "human_vs_ai_comparison",
+      "contract_derived_fixture_authoring"
+    ],
+    "forbidden_uses": [
+      "training",
+      "prompt_tuning",
+      "few_shot_examples",
+      "self_improvement_against_same_holdout"
+    ],
+    "comparison_metrics": [
+      "selected_metric_pass_rate",
+      "distributional_alignment",
+      "objective_coverage",
+      "question_rationale_coverage",
+      "chart_decision_quality"
+    ]
+  },
+  "provenance": {
+    "source_files": [
+      "research/source_of_truth/manifest.json",
+      "research/README.md"
+    ],
+    "authored_by": "codex",
+    "reviewed_by": "",
+    "contract_hash": ""
+  }
+}

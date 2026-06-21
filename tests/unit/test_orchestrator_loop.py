@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pytest
 
+from synthetix.benchmarking.golden_path import generate_golden_path_proof
 from synthetix.orchestration.loop import (
     AgentModel,
     OrchestratorLoop,
@@ -12,6 +13,7 @@ from synthetix.orchestration.loop import (
     TaskStatus,
     VerificationResult,
 )
+from synthetix.orchestration.intake_review import review_golden_path_workspace
 
 
 REQUIRED_SPEC_IDS = [
@@ -25,6 +27,7 @@ REQUIRED_SPEC_IDS = [
     "07-honest-predictor-improvement",
     "08-rich-reporting-upgrade",
     "09-research-design-study-plan",
+    "10-golden-path-intake-reset",
 ]
 
 
@@ -130,6 +133,79 @@ def test_orchestrator_exposes_research_design_task_after_reporting_upgrade(tmp_p
         "integration_tests",
         "policy_gates",
     ]
+
+
+def test_orchestrator_exposes_contract_fixture_proof_review_task(tmp_path: Path) -> None:
+    state_path = tmp_path / "state.json"
+    state_path.write_text(
+        json.dumps(
+            {
+                "completed_specs": REQUIRED_SPEC_IDS[:10],
+                "active_task_id": None,
+                "rejected_attempts": [],
+                "accepted_artifacts": [],
+                "last_verification": None,
+            }
+        ),
+        encoding="utf-8",
+    )
+    loop = OrchestratorLoop.for_workspace(Path.cwd(), state_path=state_path)
+
+    task = loop.next_task()
+
+    assert task.spec_id == "10-golden-path-intake-reset"
+    assert task.assigned_model == AgentModel.GPT_5_4
+    assert task.acceptance_checks == [
+        "contract_extraction",
+        "fixture_design",
+        "proof_generation",
+        "review",
+        "unit_tests",
+        "integration_tests",
+        "policy_gates",
+    ]
+
+
+def test_orchestrator_rejects_example_golden_path_report_stub(tmp_path: Path) -> None:
+    generate_golden_path_proof(Path.cwd(), output_dir=tmp_path / "golden-path")
+    report_json = tmp_path / "golden-path" / "report-proof" / "report.json"
+    report = json.loads(report_json.read_text(encoding="utf-8"))
+    report["run_id"] = "example"
+    report["title"] = "Synthetic scenario exploration"
+    report["provenance"]["model_id"] = "example/model"
+    report_json.write_text(json.dumps(report, indent=2), encoding="utf-8")
+
+    loop = OrchestratorLoop.for_workspace(
+        tmp_path / "golden-path",
+        state_path=tmp_path / "golden-path" / "state.json",
+    )
+
+    assert loop._check_acceptance(
+        loop._task_catalog()["10-golden-path-intake-reset"],
+        "proof_generation",
+    ) is False
+
+
+def test_golden_path_review_rejects_sparse_contract_evidence(tmp_path: Path) -> None:
+    proof = generate_golden_path_proof(Path.cwd(), output_dir=tmp_path / "golden-path")
+    professional = next(
+        item for item in proof.proofs if item.fixture_class == "professional_survey_dry_run"
+    )
+    comparison_path = tmp_path / "golden-path" / professional.comparison_path
+    comparison = json.loads(comparison_path.read_text(encoding="utf-8"))
+    comparison["fields"][0]["evidence_snippets"] = []
+    comparison["fields"][0]["substantive_evidence"] = False
+    comparison["fields"][0]["passed"] = True
+    comparison_path.write_text(json.dumps(comparison, indent=2), encoding="utf-8")
+
+    review = review_golden_path_workspace(
+        Path.cwd(),
+        proof_path=tmp_path / "golden-path" / "intake-proof" / "proof-summary.json",
+        output_path=tmp_path / "golden-path" / "review-latest.json",
+    )
+
+    assert review.passed is False
+    assert any(finding.code == "contract_sparse_evidence" for finding in review.findings)
 
 
 def test_orchestrator_rejects_holdout_paths_except_holdout_readiness() -> None:

@@ -1,0 +1,100 @@
+{
+  "fixture_id": "val_golden_path_bad_input_scanned_v1",
+  "data_partition": "validation",
+  "evaluation_only": true,
+  "training_allowed": false,
+  "fixture_class": "bad_input_document",
+  "source_material": {
+    "format": "scanned_pdf_simulation",
+    "title": "Bad scanned survey source",
+    "body": "This fixture intentionally simulates a layout-heavy or scanned PDF with too little extractable local text for professional intake."
+  },
+  "expected_contract_fields": [
+    {
+      "field": "blocked_intake_contract",
+      "expected_markers": [
+        "scan",
+        "layout"
+      ],
+      "min_matches": 2
+    },
+    {
+      "field": "source_title",
+      "expected_markers": [
+        "Bad scanned survey source"
+      ],
+      "min_matches": 1
+    }
+  ],
+  "expected_research_intake": {
+    "mode": "professional",
+    "source_type": "scanned_pdf_simulation",
+    "research_context": "Professional intake attempted from a layout-heavy or scanned document.",
+    "target_population_summary": "Unknown because source extraction is insufficient.",
+    "target_population_size": null,
+    "source_sample_size": null,
+    "intended_synthetic_panel_size": 8,
+    "segment_variables": [
+      "unresolved"
+    ],
+    "expected_analyses": [
+      "Professional intake must stop until Gemini or manual structured intake is supplied."
+    ],
+    "unresolved_gaps": [
+      "Target population, source sample size, segmentation, and questionnaire rationale are not reliably extractable locally."
+    ],
+    "extraction_confidence_expectation": "low",
+    "professional_mode_blocked_without_gemini": true
+  },
+  "expected_study_plan": {
+    "study_type": "questionnaire_dry_run",
+    "objectives": [
+      "Prove bad professional input is rejected until the source is structured."
+    ],
+    "decision_questions": [
+      "Can the document support professional study planning without external OCR or manual intake?"
+    ],
+    "assumptions": [
+      "Low-confidence local extraction is insufficient for professional reporting."
+    ],
+    "question_roles": {
+      "q1": "diagnostic"
+    },
+    "chart_plan": [
+      "Suppress all charts until professional intake succeeds."
+    ]
+  },
+  "expected_question_rationales": [
+    {
+      "question_id": "q1",
+      "role": "diagnostic",
+      "rationale": "Detects whether the source document is usable for professional intake."
+    }
+  ],
+  "expected_synthetic_panel_limits": {
+    "intended_synthetic_panel_size": 8,
+    "require_separate_reporting": true,
+    "must_not_execute_professional_report": true
+  },
+  "expected_segmentation_behavior": {
+    "segment_variables": [
+      "unresolved"
+    ],
+    "minimum_base_rule": "Do not report subgroup cuts until intake is repaired."
+  },
+  "expected_chart_decisions": [
+    {
+      "question_id": "q1",
+      "status": "suppressed",
+      "reason_contains": "low-confidence extraction"
+    }
+  ],
+  "expected_report_warnings": [
+    "Professional PDF intake requires Gemini document understanding or manual structured intake when local text extraction confidence is low."
+  ],
+  "expected_human_fieldwork_handoff": [
+    "Do not field this survey until the source has been OCRed or manually structured.",
+    "Resolve target population, sample size, segmentation, and questionnaire rationale before professional reporting."
+  ],
+  "instance_status": "authoring_complete"
+}

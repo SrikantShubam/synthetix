@@ -6,10 +6,12 @@ from pathlib import Path
 from pydantic import BaseModel, Field
 
 from synthetix.benchmarking.golden_path import (
+    GoldenPathProofSummary,
     load_golden_path_fixtures,
     validate_golden_path_fixture_set,
 )
 from synthetix.orchestration.intake_review import load_review
+from synthetix.reporting.models import ReportModel
 
 
 class AgentModel(StrEnum):
@@ -327,15 +329,49 @@ class OrchestratorLoop:
             return (self.workspace / "tests/unit/test_research_design.py").exists()
         if check == "report_objective_coverage":
             return (self.workspace / "tests/unit/test_research_design_reporting.py").exists()
-        if check == "golden_path_fixtures":
+        if check == "contract_extraction":
+            return (self.workspace / "research/golden_paper_contract.json").exists()
+        if check == "fixture_design":
             fixture_dir = self.workspace / "research/benchmark_program/validation"
             if not fixture_dir.exists():
                 return False
             fixtures = load_golden_path_fixtures(fixture_dir)
             return bool(fixtures) and not validate_golden_path_fixture_set(fixtures)
-        if check == "pdf_ocr_proof":
-            return (self.workspace / "data/golden-path/intake-proof/proof-summary.json").exists()
-        if check == "golden_path_review":
+        if check == "proof_generation":
+            proof_path = self.workspace / "data/golden-path/intake-proof/proof-summary.json"
+            if not proof_path.exists():
+                return False
+            proof_summary = GoldenPathProofSummary.model_validate_json(
+                proof_path.read_text(encoding="utf-8")
+            )
+            if not proof_summary.report_artifacts:
+                return False
+            if not proof_summary.report_quality_path or not (self.workspace / proof_summary.report_quality_path).exists():
+                return False
+            if any(not (self.workspace / artifact).exists() for artifact in proof_summary.report_artifacts):
+                return False
+            report_json = next(
+                (self.workspace / artifact for artifact in proof_summary.report_artifacts if artifact.endswith("report.json")),
+                None,
+            )
+            if report_json is None or not report_json.exists():
+                return False
+            report = ReportModel.model_validate_json(report_json.read_text(encoding="utf-8"))
+            if (
+                report.run_id == "example"
+                or report.title == "Synthetic scenario exploration"
+                or report.provenance.model_id == "example/model"
+            ):
+                return False
+            if not report.questions or not report.executive_findings:
+                return False
+            if any(
+                proof.source_format != "markdown_brief" and proof.comparison_path is None
+                for proof in proof_summary.proofs
+            ):
+                return False
+            return True
+        if check == "review":
             review_path = self.workspace / "data/golden-path/review-latest.json"
             return review_path.exists() and load_review(review_path).passed
         return False
@@ -478,9 +514,10 @@ class OrchestratorLoop:
                 ],
                 forbidden_paths=["research/source_of_truth", "data/benchmark-results/holdout"],
                 acceptance_checks=[
-                    "golden_path_fixtures",
-                    "pdf_ocr_proof",
-                    "golden_path_review",
+                    "contract_extraction",
+                    "fixture_design",
+                    "proof_generation",
+                    "review",
                     "unit_tests",
                     "integration_tests",
                     "policy_gates",

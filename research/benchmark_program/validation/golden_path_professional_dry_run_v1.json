@@ -6,82 +6,214 @@
   "fixture_class": "professional_survey_dry_run",
   "source_material": {
     "format": "pdf_brief",
-    "title": "Professional mobility workflow study",
-    "body": "Research context: pre-fieldwork survey dry run for a workflow adoption study. Target population: adults responsible for fleet workflow decisions in the United States. Source sample size for the intended human study is 800. Estimated target population size is 12000. Segment variables: region and role. Expected analyses: adoption topline, region cut, role cut, barrier themes. The synthetic panel should remain small and be clearly separated from the target population scale."
+    "title": "EEA Professional Climate Survey Report",
+    "body": "Source material is the EEA Professional Climate Survey Report. It covers the European Economic Association / MinE professional climate survey of 861 respondents, focused on equality, diversity, inclusiveness, and comparisons with the AEA 2018 survey. The dry run should stay aligned to the report's general climate, opinions and perceptions, discrimination, avoidance, exclusion, and regional comparison structure."
   },
+  "test_case_source_document": {
+    "path": "research/benchmark_program/development/sources/2508.04302_eea_professional_climate_survey_report.pdf",
+    "paper_id": "eea_professional_climate_survey_report",
+    "title": "EEA Professional Climate Survey Report"
+  },
+  "expected_contract_fields": [
+    {
+      "field": "research_context",
+      "expected_markers": [
+        "European Economic Association",
+        "Minorities in Economics",
+        "equality, diversity, and inclusiveness",
+        "professional climate survey"
+      ],
+      "min_matches": 3
+    },
+    {
+      "field": "source_sample_size",
+      "expected_markers": [
+        "861"
+      ],
+      "min_matches": 1
+    },
+    {
+      "field": "segment_variables",
+      "expected_markers": [
+        "gender",
+        "ethnic minority",
+        "LGBTQ+",
+        "disability",
+        "countries"
+      ],
+      "min_matches": 4
+    },
+    {
+      "field": "expected_analyses",
+      "expected_markers": [
+        "general climate",
+        "opinions and perceptions",
+        "experiences of discrimination",
+        "actions taken to avoid possible harassment",
+        "experiences of exclusion and harassment"
+      ],
+      "min_matches": 4
+    },
+    {
+      "field": "comparative_frame",
+      "expected_markers": [
+        "AEA 2018",
+        "compare our results",
+        "across Europe"
+      ],
+      "min_matches": 2
+    },
+    {
+      "field": "limitations",
+      "expected_markers": [
+        "response rate",
+        "representativeness",
+        "caution"
+      ],
+      "min_matches": 2
+    }
+  ],
   "expected_research_intake": {
     "mode": "professional",
     "source_type": "pdf_brief",
-    "research_context": "Pre-fieldwork professional survey dry run for workflow adoption.",
-    "target_population_summary": "Adults responsible for fleet workflow decisions in the United States.",
-    "target_population_size": 12000,
-    "source_sample_size": 800,
+    "research_context": "EEA professional climate survey of current and former members, with Europe-wide regional comparisons and AEA 2018 context.",
+    "target_population_summary": "Current and former EEA members and related economics professionals across Europe.",
+    "target_population_size": 861,
+    "source_sample_size": 861,
     "intended_synthetic_panel_size": 12,
-    "segment_variables": ["region", "role"],
-    "expected_analyses": ["Adoption topline", "Region cut", "Role cut", "Barrier themes"],
-    "unresolved_gaps": ["Weighting plan is not yet specified."],
+    "segment_variables": [
+      "gender",
+      "ethnic minority status",
+      "LGBTQ+ status",
+      "disability status",
+      "country/region group"
+    ],
+    "expected_analyses": [
+      "General climate toplines",
+      "Perceptions of respect and inclusion",
+      "Discrimination and avoidance behavior",
+      "Regional comparisons across Europe",
+      "Comparison against AEA 2018"
+    ],
+    "unresolved_gaps": [
+      "The report publishes a respondent sample of 861, but it does not define a broader universe size for the underlying EEA population.",
+      "Small-country groups in the regional cut should stay under the minimum-base threshold."
+    ],
     "extraction_confidence_expectation": "high",
     "professional_mode_blocked_without_gemini": false
   },
   "expected_study_plan": {
     "study_type": "questionnaire_dry_run",
-    "objectives": ["Measure adoption intent.", "Identify segment-specific barriers.", "Validate the survey plan before fieldwork."],
-    "decision_questions": ["Should the survey proceed to fieldwork?", "Which segment objections require mitigation first?"],
-    "assumptions": ["Synthetic responses are exploratory only.", "The synthetic panel must not be confused with the target population."],
+    "objectives": [
+      "Validate questionnaire wording against the EEA professional climate survey structure.",
+      "Check which closed-ended items should be charted, tabulated, or converted to evidence panels.",
+      "Surface segment suppression rules before human fieldwork.",
+      "Preserve AEA comparison context without overstating representativeness."
+    ],
+    "decision_questions": [
+      "Which general climate items deserve topline charts?",
+      "Which regional or subgroup cuts need suppression or tabular handling?",
+      "Does the questionnaire separate climate, discrimination, avoidance, and harassment cleanly?"
+    ],
+    "assumptions": [
+      "Synthetic responses are exploratory scenario evidence only.",
+      "The 861-respondent report is not a representative census of the wider European economics profession.",
+      "AEA comparison text is contextual rather than a claim of full replication."
+    ],
     "question_roles": {
       "q1": "primary_outcome",
       "q2": "driver",
-      "q3": "qualitative_probe"
+      "q3": "qualitative_probe",
+      "q4": "diagnostic",
+      "q5": "qualitative_probe"
     },
-    "chart_plan": ["Render closed-ended toplines and segment cuts.", "Replace open-text series with evidence panels."]
+    "chart_plan": [
+      "Render closed-ended toplines for general climate and discrimination items with explicit denominators.",
+      "Use tables for regional comparisons and underpowered subgroup cuts.",
+      "Replace open-ended follow-ups with coded evidence panels rather than raw text charts."
+    ]
   },
   "expected_question_rationales": [
     {
       "question_id": "q1",
       "role": "primary_outcome",
-      "rationale": "Measures adoption intent for the core fieldwork decision."
+      "rationale": "Measures the headline general-climate satisfaction item that the report summarizes at 23% overall, 15% for women, and 31% for men."
     },
     {
       "question_id": "q2",
       "role": "driver",
-      "rationale": "Identifies the main structured barrier behind hesitation."
+      "rationale": "Captures the discrimination and unfair-treatment block that the paper uses to explain the climate gap across groups."
     },
     {
       "question_id": "q3",
       "role": "qualitative_probe",
-      "rationale": "Captures the detailed reason behind the structured barrier choice."
+      "rationale": "Captures the reasons respondents avoid speaking up or disclosing identity, mirroring the report's avoidance and harassment themes."
+    },
+    {
+      "question_id": "q4",
+      "role": "diagnostic",
+      "rationale": "Checks whether regional and country-group cuts preserve the Nordic, Italy, UK/Ireland, and Iberia patterns without overclaiming small bases."
+    },
+    {
+      "question_id": "q5",
+      "role": "qualitative_probe",
+      "rationale": "Captures the single most important unresolved climate, discrimination, or fieldwork issue in free text for later coding."
     }
   ],
   "expected_synthetic_panel_limits": {
-    "target_population_size": 12000,
-    "source_sample_size": 800,
+    "target_population_size": 861,
+    "source_sample_size": 861,
     "intended_synthetic_panel_size": 12,
     "require_separate_reporting": true
   },
   "expected_segmentation_behavior": {
-    "segment_variables": ["region", "role"],
-    "minimum_base_rule": "Suppress slices below n=2.",
-    "suppression_rule": "Mark suppressed cuts explicitly."
+    "segment_variables": [
+      "gender",
+      "ethnic minority status",
+      "LGBTQ+ status",
+      "disability status",
+      "country/region group"
+    ],
+    "minimum_base_rule": "Suppress country-group or subgroup slices below the minimum base and state the reason explicitly.",
+    "suppression_rule": "Use tables or warnings instead of unstable segment claims."
   },
   "expected_chart_decisions": [
     {
       "question_id": "q1",
       "status": "rendered",
-      "reason_contains": "stable base"
+      "reason_contains": "stable 6-point base"
+    },
+    {
+      "question_id": "q2",
+      "status": "rendered",
+      "reason_contains": "closed-ended discrimination block"
     },
     {
       "question_id": "q3",
       "status": "replaced_with_evidence_panel",
-      "reason_contains": "coded themes and quotes"
+      "reason_contains": "coded themes and traceable quotes"
+    },
+    {
+      "question_id": "q4",
+      "status": "replaced_with_table",
+      "reason_contains": "regional cuts and minimum-base suppression"
+    },
+    {
+      "question_id": "q5",
+      "status": "replaced_with_evidence_panel",
+      "reason_contains": "open-text follow-up"
     }
   ],
   "expected_report_warnings": [
     "Synthetic scenario evidence only.",
-    "Do not treat 12 synthetic respondents as representative of the 12,000-person target population."
+    "Do not treat the 861-respondent report as a representative census of the wider European economics profession.",
+    "The report itself warns that response rates and representativeness are limited, so the synthetic panel must stay separate from the source sample.",
+    "AEA comparisons are contextual and should not be recast as a full replication claim."
   ],
   "expected_human_fieldwork_handoff": [
-    "Use the dry run to check question logic and chart planning before fieldwork.",
-    "Proceed to human fieldwork only after the segmentation and sample plan are finalized."
+    "Use the dry run to validate climate, discrimination, and avoidance wording before human fieldwork.",
+    "Finalize country-group cuts and minimum-base rules before launch.",
+    "Proceed to fieldwork only after the questionnaire and disclosure language are locked."
   ],
   "instance_status": "authoring_complete"
 }
