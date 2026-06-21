@@ -4,13 +4,13 @@
 <section>
   <p class="eyebrow">New run</p>
   <h1>Ingest a survey blueprint</h1>
-  <p>Upload strict JSON/YAML or a PDF, Markdown, or text questionnaire. Documents are parsed through OpenRouter only after confirmation.</p>
+  <p>Upload strict JSON/YAML or a PDF, Markdown, or text questionnaire. Documents are parsed through OpenRouter after confirmation, and PDFs can use Gemini document understanding when a Gemini API key is configured.</p>
   <form action="/ingest" method="post" enctype="multipart/form-data">
     <label>Survey file<input type="file" name="file" accept=".json,.yaml,.yml,.pdf,.md,.txt" required></label>
     <label class="check"><input type="checkbox" name="confirm_transmission" value="true"> I approve external transmission for document parsing.</label>
+    <label class="check"><input type="checkbox" name="professional_mode" value="true"> Treat this as a professional dry run and enforce stricter intake/report gates.</label>
     <button type="submit">Validate input</button>
   </form>
 </section>
 <aside class="warning"><strong>Research boundary</strong><br>Synthetic personas do not estimate real population behavior, prevalence, causality, or statistical significance.</aside>
 {% endblock %}
-

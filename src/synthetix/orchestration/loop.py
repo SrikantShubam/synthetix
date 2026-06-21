@@ -5,6 +5,12 @@ from pathlib import Path
 
 from pydantic import BaseModel, Field
 
+from synthetix.benchmarking.golden_path import (
+    load_golden_path_fixtures,
+    validate_golden_path_fixture_set,
+)
+from synthetix.orchestration.intake_review import load_review
+
 
 class AgentModel(StrEnum):
     GPT_5_4 = "gpt-5.4"
@@ -246,6 +252,7 @@ class OrchestratorLoop:
             "07-honest-predictor-improvement",
             "08-rich-reporting-upgrade",
             "09-research-design-study-plan",
+            "10-golden-path-intake-reset",
         }
         if task.spec_id in high_judgment_specs and task.assigned_model != AgentModel.GPT_5_4:
             raise ValueError(f"Spec '{task.spec_id}' must be assigned to GPT-5.4")
@@ -320,6 +327,17 @@ class OrchestratorLoop:
             return (self.workspace / "tests/unit/test_research_design.py").exists()
         if check == "report_objective_coverage":
             return (self.workspace / "tests/unit/test_research_design_reporting.py").exists()
+        if check == "golden_path_fixtures":
+            fixture_dir = self.workspace / "research/benchmark_program/validation"
+            if not fixture_dir.exists():
+                return False
+            fixtures = load_golden_path_fixtures(fixture_dir)
+            return bool(fixtures) and not validate_golden_path_fixture_set(fixtures)
+        if check == "pdf_ocr_proof":
+            return (self.workspace / "data/golden-path/intake-proof/proof-summary.json").exists()
+        if check == "golden_path_review":
+            review_path = self.workspace / "data/golden-path/review-latest.json"
+            return review_path.exists() and load_review(review_path).passed
         return False
 
     def _no_holdout_contamination(self, task: OrchestratorTask) -> bool:
@@ -439,6 +457,30 @@ class OrchestratorLoop:
                     "prompt_contract_tests",
                     "report_objective_coverage",
                     "professional_report_quality",
+                    "unit_tests",
+                    "integration_tests",
+                    "policy_gates",
+                ],
+            ),
+            "10-golden-path-intake-reset": OrchestratorTask(
+                spec_id="10-golden-path-intake-reset",
+                task_id="10-golden-path-intake-reset",
+                title="Golden path intake reset",
+                assigned_model=AgentModel.GPT_5_4,
+                allowed_paths=[
+                    "src/synthetix/benchmarking",
+                    "src/synthetix/orchestration",
+                    "src/synthetix/cli",
+                    "research/benchmark_program/validation",
+                    "tests",
+                    "docs/specs/10-golden-path-intake-reset.md",
+                    "data/golden-path",
+                ],
+                forbidden_paths=["research/source_of_truth", "data/benchmark-results/holdout"],
+                acceptance_checks=[
+                    "golden_path_fixtures",
+                    "pdf_ocr_proof",
+                    "golden_path_review",
                     "unit_tests",
                     "integration_tests",
                     "policy_gates",

@@ -5,7 +5,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
-from synthetix.blueprints.models import ResearchDesign
+from synthetix.blueprints.models import ResearchDesign, ResearchIntake
 
 
 class Distribution(BaseModel):
@@ -22,6 +22,11 @@ class AnalyticsChart(BaseModel):
     full_labels: list[str] = Field(default_factory=list)
     denominator: int = 0
     option: dict[str, Any] = Field(default_factory=dict)
+
+
+class ChartDecision(BaseModel):
+    status: Literal["rendered", "suppressed", "replaced_with_table", "replaced_with_evidence_panel"]
+    reason: str
 
 
 class ReportAnalytics(BaseModel):
@@ -57,6 +62,7 @@ class SegmentCut(BaseModel):
     value: str
     base_count: int
     suppressed: bool = False
+    suppression_reason: str = ""
     distribution: Distribution = Field(default_factory=Distribution)
     themes: list[ThemeEvidence] = Field(default_factory=list)
 
@@ -100,6 +106,7 @@ class QuestionReport(BaseModel):
     themes: list[ThemeEvidence] = Field(default_factory=list)
     segment_cuts: list[SegmentCut] = Field(default_factory=list)
     chart: AnalyticsChart | None = None
+    chart_decision: ChartDecision | None = None
 
 
 class FailureSummary(BaseModel):
@@ -139,8 +146,10 @@ class ReportModel(BaseModel):
     segment_composition: list[SegmentComposition] = Field(default_factory=list)
     analytics: ReportAnalytics = Field(default_factory=ReportAnalytics)
     research_design: ResearchDesign | None = None
+    research_intake: ResearchIntake | None = None
     objective_coverage: list[ObjectiveCoverage] = Field(default_factory=list)
     sensitivity_notes: list[str] = Field(default_factory=list)
+    fieldwork_handoff: list[str] = Field(default_factory=list)
     methodology: MethodologySummary | None = None
     failures: FailureSummary
     provenance: ProvenanceSummary

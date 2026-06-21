@@ -177,6 +177,16 @@ def _question_role_lines(blueprint: SimulationBlueprint) -> list[str]:
     ]
 
 
+def _question_rationale_lines(blueprint: SimulationBlueprint) -> list[str]:
+    research_intake = blueprint.research_intake
+    if research_intake is None:
+        return []
+    return [
+        f"{question.id}: {research_intake.question_rationales.get(question.id, 'No rationale supplied.')}"
+        for question in blueprint.questions
+    ]
+
+
 def _answer_contract_lines(blueprint: SimulationBlueprint) -> list[str]:
     lines: list[str] = []
     for question in blueprint.questions:
@@ -201,6 +211,23 @@ def build_execution_user_prompt(blueprint: SimulationBlueprint) -> str:
         objectives = "\n".join(f"- {objective}" for objective in research_design.research_objectives)
         assumptions = "\n".join(f"- {assumption}" for assumption in research_design.assumptions[:4])
         question_roles = "\n".join(f"- {line}" for line in _question_role_lines(blueprint))
+        research_intake = blueprint.research_intake
+        intake_context = ""
+        if research_intake is not None:
+            question_rationale = "\n".join(
+                f"- {line}" for line in _question_rationale_lines(blueprint)
+            )
+            intake_context = (
+                "Research intake context:\n"
+                f"- Source type: {research_intake.source_type}\n"
+                f"- Research context: {research_intake.research_context}\n"
+                "- Target/source scale: "
+                f"target_population_size={research_intake.target_population_size}; "
+                f"source_sample_size={research_intake.source_sample_size}; "
+                f"synthetic_panel_size={research_intake.intended_synthetic_panel_size}\n"
+                "Question rationale:\n"
+                f"{question_rationale}\n"
+            )
         study_context = (
             "Study objectives:\n"
             f"{objectives}\n"
@@ -208,6 +235,7 @@ def build_execution_user_prompt(blueprint: SimulationBlueprint) -> str:
             f"{assumptions}\n"
             "Question roles:\n"
             f"{question_roles}\n"
+            f"{intake_context}"
         )
     answer_contract = "\n".join(f"- {line}" for line in _answer_contract_lines(blueprint))
     return (

@@ -6,6 +6,8 @@ Add a professional study-design layer between ingestion and execution. Personas 
 
 This layer is standards-aligned, not standards-certified. It should follow the disclosure and quality principles in ISO 20252-style market, opinion, and social research service requirements, AAPOR disclosure expectations, and ICC/ESOMAR ethics and transparency guidance.
 
+The golden path now starts one step earlier with `ResearchIntake`. `ResearchIntake` captures what seed material actually says about context, target population, source/sample scale, synthetic panel intent, segment variables, questionnaire signals, expected analyses, and unresolved gaps before a professional `ResearchDesign` is trusted.
+
 ## Required Behavior
 
 - Every simulation has a `ResearchDesign`, either explicit or derived.
@@ -39,11 +41,15 @@ Required fields for professional report mode:
 ## Pipeline Changes
 
 - JSON/YAML ingestion accepts `research_design` directly.
-- Document ingestion extracts or proposes a study plan for user review before approval.
+- JSON/YAML ingestion may also accept `research_intake` directly when the user already has a structured intake.
+- Document ingestion extracts or proposes a `ResearchIntake` first, then derives or confirms a study plan for user review before approval.
+- Professional PDF intake cannot pass on low-confidence local extraction alone. It requires Gemini document understanding after explicit external-transmission approval or a manual structured intake/blueprint.
 - Validation blocks professional report mode when objectives, target population, mapped questions, analysis plan, or disclosure plan are missing.
+- Validation also blocks professional mode when intake scale, segment variables, expected analyses, extraction confidence, or per-question rationale coverage are missing.
 - Execution prompts include study objective, assumptions summary, question role, and answer contract.
+- Execution prompts keep intake context, study design, and respondent persona instructions separate.
 - Analysis builds planned-vs-delivered outputs from the analysis plan.
-- Reporting includes research objectives, assumptions, study design, planned analyses, objective coverage, assumptions review, standards-alignment disclosure, and planned-vs-delivered appendix.
+- Reporting includes research intake, research objectives, assumptions, study design, target/source scale versus synthetic panel size, planned analyses, objective coverage, chart-decision rationale, assumptions review, standards-alignment disclosure, and planned-vs-delivered appendix.
 
 ## Orchestrator Loop Requirements
 

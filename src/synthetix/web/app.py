@@ -14,6 +14,11 @@ from fastapi.templating import Jinja2Templates
 
 from synthetix.application import RunService
 from synthetix.ingestion.documents import DocumentLimits, UnsafeDocument, extract_document
+from synthetix.ingestion.gemini_documents import GeminiDocumentParser
+from synthetix.ingestion.intake import (
+    ensure_professional_document_intake_allowed,
+    merge_research_intake,
+)
 from synthetix.ingestion.questionnaire import parse_questionnaire
 from synthetix.ingestion.structured import parse_blueprint_text
 from synthetix.guardrails.preflight import GuardrailViolation
@@ -57,6 +62,7 @@ def create_app(*, data_dir: Path | None = None) -> FastAPI:
         request: Request,
         file: UploadFile = File(...),
         confirm_transmission: bool = Form(False),
+        professional_mode: bool = Form(False),
     ) -> HTMLResponse:
         filename = Path(file.filename or "upload").name
         suffix = Path(filename).suffix.lower()
@@ -88,12 +94,53 @@ def create_app(*, data_dir: Path | None = None) -> FastAPI:
                         path,
                         DocumentLimits(settings.max_upload_bytes, settings.max_pdf_pages),
                     )
+                    intake_hint = None
+                    used_gemini = False
+                    if suffix == ".pdf" and settings.effective_gemini_api_key:
+                        gemini = GeminiDocumentParser(api_key=settings.effective_gemini_api_key)
+                        gemini_result = gemini.parse(path)
+                        extracted = extracted.__class__(
+                            text=gemini_result.extracted_text,
+                            sha256=extracted.sha256,
+                            media_type=extracted.media_type,
+                            pages=extracted.pages,
+                            extraction_method="gemini_document_understanding",
+                            extraction_confidence="high",
+                        )
+                        intake_hint = gemini_result.research_intake
+                        used_gemini = True
+                    ensure_professional_document_intake_allowed(
+                        extracted,
+                        professional_mode=professional_mode,
+                        used_gemini=used_gemini,
+                    )
                 profile = DEFAULT_PROFILES.get("openrouter-default")
                 gateway = OpenRouterGateway(settings.openrouter_api_key)
                 try:
-                    blueprint = await parse_questionnaire(extracted.text, gateway, profile)
+                    blueprint = await parse_questionnaire(
+                        extracted.text,
+                        gateway,
+                        profile,
+                        research_intake=intake_hint,
+                    )
                 finally:
                     await gateway.close()
+                blueprint.research_intake = merge_research_intake(
+                    blueprint,
+                    source_type=(
+                        "pdf_gemini"
+                        if extracted.media_type == "application/pdf"
+                        and extracted.extraction_method == "gemini_document_understanding"
+                        else (
+                            "pdf_local_text"
+                            if extracted.media_type == "application/pdf"
+                            else ("questionnaire_markdown" if suffix == ".md" else "questionnaire_text")
+                        )
+                    ),
+                    extracted_document=extracted,
+                    research_intake_hint=intake_hint,
+                    professional_mode=professional_mode,
+                )
                 source_hashes[filename] = extracted.sha256
             else:
                 raise HTTPException(415, "Supported files: JSON, YAML, PDF, Markdown, text")

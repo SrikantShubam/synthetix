@@ -1,0 +1,87 @@
+{
+  "fixture_id": "val_golden_path_professional_dry_run_v1",
+  "data_partition": "validation",
+  "evaluation_only": true,
+  "training_allowed": false,
+  "fixture_class": "professional_survey_dry_run",
+  "source_material": {
+    "format": "pdf_brief",
+    "title": "Professional mobility workflow study",
+    "body": "Research context: pre-fieldwork survey dry run for a workflow adoption study. Target population: adults responsible for fleet workflow decisions in the United States. Source sample size for the intended human study is 800. Estimated target population size is 12000. Segment variables: region and role. Expected analyses: adoption topline, region cut, role cut, barrier themes. The synthetic panel should remain small and be clearly separated from the target population scale."
+  },
+  "expected_research_intake": {
+    "mode": "professional",
+    "source_type": "pdf_brief",
+    "research_context": "Pre-fieldwork professional survey dry run for workflow adoption.",
+    "target_population_summary": "Adults responsible for fleet workflow decisions in the United States.",
+    "target_population_size": 12000,
+    "source_sample_size": 800,
+    "intended_synthetic_panel_size": 12,
+    "segment_variables": ["region", "role"],
+    "expected_analyses": ["Adoption topline", "Region cut", "Role cut", "Barrier themes"],
+    "unresolved_gaps": ["Weighting plan is not yet specified."],
+    "extraction_confidence_expectation": "high",
+    "professional_mode_blocked_without_gemini": false
+  },
+  "expected_study_plan": {
+    "study_type": "questionnaire_dry_run",
+    "objectives": ["Measure adoption intent.", "Identify segment-specific barriers.", "Validate the survey plan before fieldwork."],
+    "decision_questions": ["Should the survey proceed to fieldwork?", "Which segment objections require mitigation first?"],
+    "assumptions": ["Synthetic responses are exploratory only.", "The synthetic panel must not be confused with the target population."],
+    "question_roles": {
+      "q1": "primary_outcome",
+      "q2": "driver",
+      "q3": "qualitative_probe"
+    },
+    "chart_plan": ["Render closed-ended toplines and segment cuts.", "Replace open-text series with evidence panels."]
+  },
+  "expected_question_rationales": [
+    {
+      "question_id": "q1",
+      "role": "primary_outcome",
+      "rationale": "Measures adoption intent for the core fieldwork decision."
+    },
+    {
+      "question_id": "q2",
+      "role": "driver",
+      "rationale": "Identifies the main structured barrier behind hesitation."
+    },
+    {
+      "question_id": "q3",
+      "role": "qualitative_probe",
+      "rationale": "Captures the detailed reason behind the structured barrier choice."
+    }
+  ],
+  "expected_synthetic_panel_limits": {
+    "target_population_size": 12000,
+    "source_sample_size": 800,
+    "intended_synthetic_panel_size": 12,
+    "require_separate_reporting": true
+  },
+  "expected_segmentation_behavior": {
+    "segment_variables": ["region", "role"],
+    "minimum_base_rule": "Suppress slices below n=2.",
+    "suppression_rule": "Mark suppressed cuts explicitly."
+  },
+  "expected_chart_decisions": [
+    {
+      "question_id": "q1",
+      "status": "rendered",
+      "reason_contains": "stable base"
+    },
+    {
+      "question_id": "q3",
+      "status": "replaced_with_evidence_panel",
+      "reason_contains": "coded themes and quotes"
+    }
+  ],
+  "expected_report_warnings": [
+    "Synthetic scenario evidence only.",
+    "Do not treat 12 synthetic respondents as representative of the 12,000-person target population."
+  ],
+  "expected_human_fieldwork_handoff": [
+    "Use the dry run to check question logic and chart planning before fieldwork.",
+    "Proceed to human fieldwork only after the segmentation and sample plan are finalized."
+  ],
+  "instance_status": "authoring_complete"
+}

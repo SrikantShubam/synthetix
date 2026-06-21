@@ -8,6 +8,7 @@ import typer
 
 from synthetix.application import RunService
 from synthetix.benchmarking.frozen import EvaluationSplit, FrozenEvaluation
+from synthetix.benchmarking.golden_path import generate_golden_path_proof
 from synthetix.benchmarking.loop import BenchmarkLoop
 from synthetix.benchmarking.predictions import DevelopmentPredictionEmitter
 from synthetix.benchmarking.runtime import BenchmarkComparator
@@ -15,6 +16,7 @@ from synthetix.guardrails.preflight import estimate_run
 from synthetix.guardrails.question_quality import assess_question_quality, question_quality_errors
 from synthetix.ingestion.structured import load_blueprint
 from synthetix.model_gateway.profiles import DEFAULT_PROFILES
+from synthetix.orchestration.intake_review import review_golden_path_workspace
 from synthetix.orchestration.loop import OrchestratorLoop, VerificationResult
 from synthetix.orchestration.quality_loop import QualityLoop, QualityTarget
 from synthetix.reporting.models import ReportModel
@@ -393,6 +395,24 @@ def quality_loop_run(
         ),
     )
     typer.echo(loop.run_once().model_dump_json(indent=2))
+
+
+@app.command("golden-path-prove")
+def golden_path_prove(
+    workspace: Path = typer.Option(Path.cwd(), "--workspace", help="Workspace root to evaluate."),
+) -> None:
+    """Generate golden-path OCR and local report proof artifacts."""
+    summary = generate_golden_path_proof(workspace)
+    typer.echo(summary.model_dump_json(indent=2))
+
+
+@app.command("golden-path-review")
+def golden_path_review(
+    workspace: Path = typer.Option(Path.cwd(), "--workspace", help="Workspace root to review."),
+) -> None:
+    """Review golden-path fixtures and OCR proof artifacts for remaining flaws."""
+    review = review_golden_path_workspace(workspace)
+    typer.echo(review.model_dump_json(indent=2))
 
 
 if __name__ == "__main__":

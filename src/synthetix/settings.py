@@ -13,6 +13,8 @@ class Settings(BaseSettings):
     database_url: str = "sqlite+aiosqlite:///./data/synthetix.db"
     openrouter_api_key: str = Field(default="", repr=False)
     groq_api_key: str = Field(default="", repr=False)
+    gemini_api_key: str = Field(default="", repr=False, validation_alias="GEMINI_API_KEY")
+    google_api_key: str = Field(default="", repr=False, validation_alias="GOOGLE_API_KEY")
     max_upload_bytes: int = 5_000_000
     max_pdf_pages: int = 50
     max_population: int = 500
@@ -29,3 +31,7 @@ class Settings(BaseSettings):
             max_cost_usd=self.max_cost_usd,
             max_concurrency=self.max_concurrency,
         )
+
+    @property
+    def effective_gemini_api_key(self) -> str:
+        return self.gemini_api_key or self.google_api_key

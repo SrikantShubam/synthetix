@@ -7,8 +7,12 @@
   <dt>Title</dt><dd>{{ blueprint.title }}</dd>
   <dt>Population</dt><dd>{{ blueprint.population.size }} synthetic personas</dd>
   <dt>Model profile</dt><dd>{{ blueprint.model.profile }}</dd>
+  {% if blueprint.research_intake %}
+  <dt>Intake mode</dt><dd>{{ blueprint.research_intake.mode }}</dd>
+  <dt>Source type</dt><dd>{{ blueprint.research_intake.source_type }}</dd>
+  <dt>Extraction confidence</dt><dd>{{ blueprint.research_intake.extraction_confidence }}</dd>
+  {% endif %}
 </dl>
 <ol>{% for question in blueprint.questions %}<li><strong>{{ question.id }}</strong> {{ question.prompt }}</li>{% endfor %}</ol>
 <a class="button" href="/runs/{{ run_id }}/preflight">Continue to preflight</a>
 {% endblock %}
-

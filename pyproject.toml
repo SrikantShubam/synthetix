@@ -7,6 +7,7 @@ dependencies = [
   "alembic>=1.14",
   "aiosqlite>=0.20",
   "fastapi>=0.115",
+  "google-genai>=1.33",
   "httpx>=0.27",
   "jinja2>=3.1",
   "matplotlib>=3.8",

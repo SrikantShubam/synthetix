@@ -153,11 +153,10 @@ def test_build_report_uses_open_text_as_traceable_evidence() -> None:
     assert question.themes[0].label == "Price sensitivity and value concern"
     assert question.themes[0].count == 2
     assert question.themes[0].supporting_quote_ids == ["q_open:p1", "q_open:p2"]
-    assert question.chart is not None
-    assert question.chart.chart_family == "question_themes"
-    assert question.chart.values == [2, 1]
-    assert question.chart.labels[0].startswith("Theme 1:")
-    assert question.chart.full_labels[0] == "Price sensitivity and value concern"
+    assert question.chart is None
+    assert question.chart_decision is not None
+    assert question.chart_decision.status == "replaced_with_evidence_panel"
+    assert "coded themes and quotes" in question.chart_decision.reason
 
 
 def test_build_report_links_executive_findings_to_response_evidence() -> None:

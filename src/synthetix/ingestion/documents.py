@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 from dataclasses import dataclass
 from pathlib import Path
+import re
 
 from pypdf import PdfReader
 
@@ -23,6 +24,8 @@ class ExtractedDocument:
     sha256: str
     media_type: str
     pages: int | None = None
+    extraction_method: str = "local_text_extraction"
+    extraction_confidence: str = "medium"
 
 
 ALLOWED_SUFFIXES = {".txt", ".md", ".pdf"}
@@ -45,6 +48,7 @@ def extract_document(path: Path, limits: DocumentLimits = DocumentLimits()) -> E
         text = "\n".join(page.extract_text() or "" for page in reader.pages)
         pages = len(reader.pages)
         media_type = "application/pdf"
+        confidence = _pdf_extraction_confidence(text, pages)
     else:
         try:
             text = data.decode("utf-8")
@@ -52,7 +56,26 @@ def extract_document(path: Path, limits: DocumentLimits = DocumentLimits()) -> E
             raise UnsafeDocument("Documents must use UTF-8 encoding") from exc
         pages = None
         media_type = "text/markdown" if resolved.suffix.lower() == ".md" else "text/plain"
+        confidence = "high"
     if not text.strip():
         raise UnsafeDocument("Document contains no extractable text")
-    return ExtractedDocument(text=text, sha256=digest, media_type=media_type, pages=pages)
+    return ExtractedDocument(
+        text=text,
+        sha256=digest,
+        media_type=media_type,
+        pages=pages,
+        extraction_method="local_text_extraction",
+        extraction_confidence=confidence,
+    )
 
+
+def _pdf_extraction_confidence(text: str, pages: int | None) -> str:
+    if not pages:
+        return "low"
+    visible = re.sub(r"\s+", " ", text).strip()
+    chars_per_page = len(visible) / max(pages, 1)
+    if chars_per_page < 40:
+        return "low"
+    if chars_per_page < 250:
+        return "medium"
+    return "high"

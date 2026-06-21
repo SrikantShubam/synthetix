@@ -113,6 +113,43 @@ REPORT_TEMPLATE = """
       <p><strong>Qualitative coding plan:</strong> {{ view.research_design.qualitative_coding }}</p>
     </section>
 
+    <section id="research-intake" class="report-section">
+      <h2>Research intake</h2>
+      <p><strong>Mode:</strong> {{ view.research_intake.mode }}</p>
+      <p><strong>Source type:</strong> {{ view.research_intake.source_type }}</p>
+      <p><strong>Research context:</strong> {{ view.research_intake.research_context }}</p>
+      <p><strong>Target population:</strong> {{ view.research_intake.target_population_summary }}</p>
+      <p><strong>Target population size:</strong> {{ view.research_intake.target_population_size }}</p>
+      <p><strong>Source sample size:</strong> {{ view.research_intake.source_sample_size }}</p>
+      <p><strong>Synthetic panel size:</strong> {{ view.research_intake.synthetic_panel_size }}</p>
+      <p><strong>Extraction method:</strong> {{ view.research_intake.extraction_method }}</p>
+      <p><strong>Extraction confidence:</strong> {{ view.research_intake.extraction_confidence }}</p>
+      {% if view.research_intake.segment_variables %}
+      <h3>Segment variables</h3>
+      <ul>
+      {% for item in view.research_intake.segment_variables %}
+        <li>{{ item }}</li>
+      {% endfor %}
+      </ul>
+      {% endif %}
+      {% if view.research_intake.expected_analyses %}
+      <h3>Expected analyses</h3>
+      <ul>
+      {% for item in view.research_intake.expected_analyses %}
+        <li>{{ item }}</li>
+      {% endfor %}
+      </ul>
+      {% endif %}
+      {% if view.research_intake.unresolved_gaps %}
+      <h3>Unresolved gaps</h3>
+      <ul>
+      {% for item in view.research_intake.unresolved_gaps %}
+        <li>{{ item }}</li>
+      {% endfor %}
+      </ul>
+      {% endif %}
+    </section>
+
     <section id="population-composition" class="report-section">
       <h2>Population composition</h2>
       {% if view.population_summary %}
@@ -147,6 +184,9 @@ REPORT_TEMPLATE = """
           </div>
           <p class="denominator">Base n = {{ question.denominator }}</p>
         </div>
+        {% if question.chart_decision_reason %}
+        <p><strong>Chart decision:</strong> {{ question.chart_decision_status }}. {{ question.chart_decision_reason }}</p>
+        {% endif %}
         {% if question.chart_path %}
         <figure class="chart-figure">
           <img src="{{ question.chart_path }}" alt="Distribution chart for {{ question.prompt }}">
@@ -174,6 +214,16 @@ REPORT_TEMPLATE = """
           <ul>
           {% for quote in question.quotes %}
             <li>{{ quote }}</li>
+          {% endfor %}
+          </ul>
+        </div>
+        {% endif %}
+        {% if question.suppressed_segments %}
+        <div class="quote-group">
+          <h4>Suppressed segment cuts</h4>
+          <ul>
+          {% for segment in question.suppressed_segments %}
+            <li>{{ segment }}</li>
           {% endfor %}
           </ul>
         </div>
@@ -267,6 +317,15 @@ REPORT_TEMPLATE = """
         </ul>
       </div>
       {% endif %}
+    </section>
+
+    <section id="fieldwork-handoff" class="report-section">
+      <h2>Fieldwork handoff</h2>
+      <ul>
+      {% for item in view.fieldwork_handoff %}
+        <li>{{ item }}</li>
+      {% endfor %}
+      </ul>
     </section>
 
     <section id="methodology" class="report-section">
@@ -671,6 +730,7 @@ def _build_questions(payload: dict[str, Any]) -> list[dict[str, Any]]:
         labels = [_coerce_text(label) for label in _coerce_list(distribution.get("labels"))]
         values = [_coerce_int(value) for value in _coerce_list(distribution.get("values"))]
         chart = _coerce_mapping(question.get("chart"))
+        chart_decision = _coerce_mapping(question.get("chart_decision"))
         chart_labels = [_coerce_text(label) for label in _coerce_list(chart.get("labels"))]
         chart_values = [_coerce_int(value) for value in _coerce_list(chart.get("values"))]
         chart_full_labels = [_coerce_text(label) for label in _coerce_list(chart.get("full_labels"))]
@@ -700,14 +760,58 @@ def _build_questions(payload: dict[str, Any]) -> list[dict[str, Any]]:
                 "chart_labels": chart_labels or labels,
                 "chart_values": chart_values or values,
                 "chart_family": _coerce_text(chart.get("chart_family")),
+                "chart_decision_status": _coerce_text(chart_decision.get("status")),
+                "chart_decision_reason": _coerce_text(chart_decision.get("reason")),
                 "rows": rows,
                 "quotes": [_coerce_text(quote) for quote in _coerce_list(question.get("quotes"))],
                 "segment_cuts": _coerce_list(question.get("segment_cuts")),
+                "suppressed_segments": [
+                    (
+                        f"{_coerce_text(_coerce_mapping(segment).get('attribute'))}="
+                        f"{_coerce_text(_coerce_mapping(segment).get('value'))}: "
+                        f"{_coerce_text(_coerce_mapping(segment).get('suppression_reason'))}"
+                    )
+                    for segment in _coerce_list(question.get("segment_cuts"))
+                    if bool(_coerce_mapping(segment).get("suppressed"))
+                    and _coerce_text(_coerce_mapping(segment).get("suppression_reason"))
+                ],
                 "themes": _coerce_list(question.get("themes")),
                 "figure_number": index,
             }
         )
     return views
+
+
+def _build_research_intake(payload: dict[str, Any]) -> dict[str, Any]:
+    intake = _coerce_mapping(payload.get("research_intake"))
+    return {
+        "mode": _coerce_text(intake.get("mode"), "novice"),
+        "source_type": _coerce_text(intake.get("source_type"), "unknown"),
+        "research_context": _coerce_text(intake.get("research_context")),
+        "target_population_summary": _coerce_text(intake.get("target_population_summary")),
+        "target_population_size": _coerce_int(intake.get("target_population_size")) or "Not provided",
+        "source_sample_size": _coerce_int(intake.get("source_sample_size")) or "Not provided",
+        "synthetic_panel_size": _coerce_int(intake.get("intended_synthetic_panel_size")),
+        "extraction_method": _coerce_text(intake.get("extraction_method")),
+        "extraction_confidence": _coerce_text(intake.get("extraction_confidence")),
+        "segment_variables": [
+            _coerce_text(item) for item in _coerce_list(intake.get("segment_variables")) if _coerce_text(item)
+        ],
+        "expected_analyses": [
+            _coerce_text(item) for item in _coerce_list(intake.get("expected_analyses")) if _coerce_text(item)
+        ],
+        "unresolved_gaps": [
+            _coerce_text(item) for item in _coerce_list(intake.get("unresolved_gaps")) if _coerce_text(item)
+        ],
+    }
+
+
+def _build_fieldwork_handoff(payload: dict[str, Any]) -> list[str]:
+    return [
+        _coerce_text(item)
+        for item in _coerce_list(payload.get("fieldwork_handoff"))
+        if _coerce_text(item)
+    ]
 
 
 def _top_response_text(question: dict[str, Any]) -> str:
@@ -1007,6 +1111,7 @@ def _build_report_view(payload: dict[str, Any]) -> dict[str, Any]:
         "executive_summary": _coerce_text(payload.get("executive_summary")),
         "executive_findings": _build_executive_findings(payload),
         "research_design": _build_research_design(payload),
+        "research_intake": _build_research_intake(payload),
         "population_summary": population_summary,
         "population_rows": population_rows,
         "population_table_number": 1,
@@ -1014,6 +1119,7 @@ def _build_report_view(payload: dict[str, Any]) -> dict[str, Any]:
 	        "question_interpretations": _build_question_interpretations(payload, questions),
 	        "segment_comparisons": segment_comparisons,
 	        "qualitative_themes": _build_qualitative_themes(payload),
+        "fieldwork_handoff": _build_fieldwork_handoff(payload),
         "failures": {
             "total_personas": _coerce_int(failures.get("total_personas")),
             "succeeded": _coerce_int(failures.get("succeeded")),
@@ -1046,12 +1152,14 @@ def _build_report_view(payload: dict[str, Any]) -> dict[str, Any]:
         "toc": [
             {"id": "executive-findings", "label": "Executive findings"},
             {"id": "research-design", "label": "Research design"},
+            {"id": "research-intake", "label": "Research intake"},
             {"id": "population-composition", "label": "Population composition"},
 	            {"id": "question-distributions", "label": "Question distributions"},
 	            {"id": "question-interpretation", "label": "Question interpretation and implications"},
 	            {"id": "segment-comparisons", "label": "Segment comparisons"},
             {"id": "qualitative-themes", "label": "Qualitative themes and evidence"},
             {"id": "failures-sensitivity", "label": "Failures and sensitivity"},
+            {"id": "fieldwork-handoff", "label": "Fieldwork handoff"},
             {"id": "methodology", "label": "Methodology"},
             {"id": "objective-coverage", "label": "Objective coverage"},
             {"id": "provenance", "label": "Provenance"},

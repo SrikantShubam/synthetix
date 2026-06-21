@@ -8,6 +8,7 @@ from synthetix.blueprints.models import (
     ModelSelection,
     OpenTextQuestion,
     PopulationSpec,
+    ResearchIntake,
     ResearchDesign,
     SimulationBlueprint,
 )
@@ -121,6 +122,75 @@ def test_legacy_blueprint_derives_lightweight_research_design() -> None:
         "q1": "primary_outcome",
         "q2": "qualitative_probe",
     }
+    assert blueprint.research_intake is not None
+    assert blueprint.research_intake.mode == "novice"
+    assert blueprint.research_intake.intended_synthetic_panel_size == 3
+
+
+def test_professional_research_intake_requires_scale_and_question_rationales() -> None:
+    blueprint = _professional_blueprint()
+    with pytest.raises(ValidationError, match="ResearchIntake"):
+        SimulationBlueprint(
+            **blueprint.model_dump(mode="python")
+            | {
+                "research_intake": ResearchIntake(
+                    mode="professional",
+                    source_type="manual",
+                    research_context="Dry run for a professional study.",
+                    target_population_summary="Adults in the workflow.",
+                    source_sample_size=400,
+                    intended_synthetic_panel_size=4,
+                    constraints=["Synthetic outputs are exploratory only."],
+                    design_choices=["Segment by region and role."],
+                    questionnaire_signals=["Need primary outcome plus barrier probe."],
+                    segment_variables=["region", "role"],
+                    expected_analyses=["Topline adoption read."],
+                    unresolved_gaps=[],
+                    question_rationales={"q1": "Primary adoption measure."},
+                    extraction_confidence="high",
+                    extraction_method="manual",
+                    external_processing_used=False,
+                )
+            }
+        )
+
+
+def test_execution_prompt_separates_research_intake_from_study_design() -> None:
+    blueprint = _professional_blueprint().model_copy(
+        update={
+            "research_intake": ResearchIntake(
+                mode="professional",
+                source_type="manual",
+                research_context="Source brief describes a pre-fieldwork concept test for workflow adoption.",
+                target_population_summary="Adults responsible for the workflow under study.",
+                target_population_size=12000,
+                source_sample_size=800,
+                intended_synthetic_panel_size=4,
+                constraints=["Do not overstate subgroup precision from the dry run."],
+                design_choices=["Keep one primary outcome and one barrier probe."],
+                questionnaire_signals=["Need a fit question and a rationale follow-up."],
+                segment_variables=["region", "role"],
+                expected_analyses=["Adoption topline and region cut."],
+                unresolved_gaps=["Income segmentation is not yet specified."],
+                question_rationales={
+                    "q1": "Measures adoption intent for the core decision.",
+                    "q2": "Captures the main adoption barrier in the respondent's own words.",
+                },
+                extraction_confidence="high",
+                extraction_method="manual",
+                external_processing_used=False,
+            )
+        }
+    )
+
+    prompt = build_execution_user_prompt(blueprint)
+
+    assert "Research intake context:" in prompt
+    assert "Target/source scale: target_population_size=12000; source_sample_size=800; synthetic_panel_size=4" in prompt
+    assert "Question rationale:" in prompt
+    assert "q1: Measures adoption intent for the core decision." in prompt
+    assert "Answer only as the synthetic respondent described in the system prompt." in prompt
+    assert "write the methodology" not in prompt.casefold()
 
 
 def test_professional_research_design_requires_objectives() -> None:

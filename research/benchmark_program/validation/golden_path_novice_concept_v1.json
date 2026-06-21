@@ -1,0 +1,79 @@
+{
+  "fixture_id": "val_golden_path_novice_concept_v1",
+  "data_partition": "validation",
+  "evaluation_only": true,
+  "training_allowed": false,
+  "fixture_class": "novice_concept_test",
+  "source_material": {
+    "format": "markdown_brief",
+    "title": "Novice snack concept dry run",
+    "body": "A novice user wants a dry run for a snack concept survey. The intent is to preview likely reactions, not estimate population prevalence. The target audience is busy office workers. Use a small synthetic panel and warn that human fieldwork is still required."
+  },
+  "expected_research_intake": {
+    "mode": "novice",
+    "source_type": "markdown_brief",
+    "research_context": "Plain-language dry run for a first concept survey.",
+    "target_population_summary": "Busy office workers considering a snack purchase.",
+    "target_population_size": 2000,
+    "source_sample_size": null,
+    "intended_synthetic_panel_size": 6,
+    "segment_variables": [],
+    "expected_analyses": ["Topline reaction readout", "Wording warning scan"],
+    "unresolved_gaps": ["Segmentation was not specified by the novice user."],
+    "extraction_confidence_expectation": "n/a",
+    "professional_mode_blocked_without_gemini": false
+  },
+  "expected_study_plan": {
+    "study_type": "concept_test",
+    "objectives": ["Preview likely reactions to the concept.", "Flag weak wording before fieldwork."],
+    "decision_questions": ["Should the concept move to human fieldwork?"],
+    "assumptions": ["Synthetic responses are exploratory only."],
+    "question_roles": {
+      "q1": "primary_outcome",
+      "q2": "qualitative_probe"
+    },
+    "chart_plan": ["Render a topline closed-ended chart.", "Suppress open-text raw charts and use evidence instead."]
+  },
+  "expected_question_rationales": [
+    {
+      "question_id": "q1",
+      "role": "primary_outcome",
+      "rationale": "Measures topline concept appeal in a simple way for a novice user."
+    },
+    {
+      "question_id": "q2",
+      "role": "qualitative_probe",
+      "rationale": "Captures the main reason behind the reaction in the respondent's own words."
+    }
+  ],
+  "expected_synthetic_panel_limits": {
+    "target_population_size": 2000,
+    "intended_synthetic_panel_size": 6,
+    "require_separate_reporting": true
+  },
+  "expected_segmentation_behavior": {
+    "segment_variables": [],
+    "minimum_base_rule": "No subgroup reporting without explicit segments."
+  },
+  "expected_chart_decisions": [
+    {
+      "question_id": "q1",
+      "status": "rendered",
+      "reason_contains": "stable base"
+    },
+    {
+      "question_id": "q2",
+      "status": "replaced_with_evidence_panel",
+      "reason_contains": "coded themes and quotes"
+    }
+  ],
+  "expected_report_warnings": [
+    "Synthetic scenario evidence only.",
+    "Do not treat the synthetic panel as representative of the target population."
+  ],
+  "expected_human_fieldwork_handoff": [
+    "Use the dry run to improve wording before real fieldwork.",
+    "Human fieldwork is still required to understand real prevalence and segment sizes."
+  ],
+  "instance_status": "authoring_complete"
+}

@@ -11,6 +11,7 @@ from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 
 from synthetix.reporting.models import (
+    ChartDecision,
     DenominatorSummary,
     Distribution,
     ExecutiveFinding,
@@ -47,6 +48,28 @@ def _rich_report() -> ReportModel:
             "seed": 17,
             "attributes": {"region": ["urban", "rural"], "role": ["operator", "manager"]},
         },
+        research_intake={
+            "mode": "professional",
+            "source_type": "manual",
+            "research_context": "Professional survey dry run from a structured brief.",
+            "target_population_summary": "Adults in the target workflow.",
+            "target_population_size": 12000,
+            "source_sample_size": 800,
+            "intended_synthetic_panel_size": 4,
+            "constraints": ["Synthetic outputs are exploratory only."],
+            "design_choices": ["Use region and role as the first cuts."],
+            "questionnaire_signals": ["Need a fit outcome and a barrier probe."],
+            "segment_variables": ["region", "role"],
+            "expected_analyses": ["Topline fit", "Barrier themes"],
+            "unresolved_gaps": ["Weighting plan is not specified."],
+            "question_rationales": {
+                "q1": "Measures concept fit for the go/no-go decision.",
+                "q2": "Captures the primary adoption barrier in the respondent's own words.",
+            },
+            "extraction_confidence": "high",
+            "extraction_method": "manual",
+            "external_processing_used": False,
+        },
         questions=[
             QuestionReport(
                 question_id="q1",
@@ -69,15 +92,21 @@ def _rich_report() -> ReportModel:
                         attribute="region",
                         value="urban",
                         base_count=2,
+                        suppression_reason="",
                         distribution=Distribution(labels=["Yes", "Maybe", "No"], values=[2, 0, 0]),
                     ),
                     SegmentCut(
                         attribute="region",
                         value="rural",
                         base_count=2,
+                        suppression_reason="",
                         distribution=Distribution(labels=["Yes", "Maybe", "No"], values=[0, 1, 1]),
                     ),
                 ],
+                chart_decision=ChartDecision(
+                    status="rendered",
+                    reason="Choice distribution has a stable base and categorical labels.",
+                ),
             ),
             QuestionReport(
                 question_id="q2",
@@ -103,6 +132,10 @@ def _rich_report() -> ReportModel:
                         supporting_quote_ids=["q2:p1", "q2:p2"],
                     )
                 ],
+                chart_decision=ChartDecision(
+                    status="replaced_with_evidence_panel",
+                    reason="Open-text evidence is better shown through coded themes and quotes than a raw chart.",
+                ),
             ),
         ],
         executive_findings=[
@@ -258,6 +291,10 @@ def _rich_report() -> ReportModel:
             "Synthetic personas are not sampled human respondents.",
             "Outputs are descriptive scenario evidence only.",
         ],
+        fieldwork_handoff=[
+            "Use the dry run to refine wording and segment rules before fielding to the target population.",
+            "Do not treat 4 synthetic respondents as representative of the 12,000-person target population.",
+        ],
         manifest={"run_id": "board-readout", "seed": 17, "source_documents": ["brief.md"]},
     )
 
@@ -310,6 +347,7 @@ def test_report_pipeline_renders_executive_and_appendix_sections(
     assert "Executive findings" in html
     assert "Population composition" in html
     assert "Research design" in html
+    assert "Research intake" in html
     assert "Question distributions" in html
     assert "Question interpretation and implications" in html
     assert "Segment comparisons" in html
@@ -321,12 +359,15 @@ def test_report_pipeline_renders_executive_and_appendix_sections(
     assert "Limitations" in html
     assert "Standards-aligned disclosure appendix" in html
     assert "Quote evidence appendix" in html
+    assert "Fieldwork handoff" in html
     assert "Technical appendix" in html
     assert "Figure 1." in html
     assert "Table 1." in html
     assert "Table 2." in html
     assert "n = 4" in html
     assert "Do not infer prevalence, causality, or statistical significance" in html
+    assert "Target population size" in html
+    assert "Synthetic panel size" in html
 
     text = "\n".join(page.extract_text() or "" for page in PdfReader(artifacts.pdf_path).pages)
     assert "Board readout: synthetic scenario exploration" in text
@@ -338,6 +379,7 @@ def test_report_pipeline_renders_executive_and_appendix_sections(
     assert "Non-inferential use warning" in text
     assert "Question interpretation and implications" in text
     assert "Quote evidence appendix" in text
+    assert "Fieldwork handoff" in text
 
     second_run = render_report(report, tmp_path / "repeat")
     first_chart_bytes = [path.read_bytes() for path in artifacts.chart_paths]

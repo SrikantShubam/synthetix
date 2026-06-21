@@ -29,6 +29,7 @@ REQUIRED_REPORT_SECTIONS: tuple[str, ...] = (
     "methodology",
     "question_results",
     "attrition",
+    "fieldwork_handoff",
     "limitations",
     "provenance",
     "appendix",
@@ -527,10 +528,11 @@ def build_quality_input(report: ReportModel, artifacts: ReportArtifacts) -> Repo
     chart_labels = [
         label
         for question in report.questions
+        if question.chart is not None
         for label in renderer_chart_labels(
             {
                 "question_type": question.question_type,
-                "labels": question.distribution.labels,
+                "labels": question.chart.labels,
             }
         )
     ]
@@ -556,9 +558,10 @@ def build_quality_input(report: ReportModel, artifacts: ReportArtifacts) -> Repo
         for finding in report.executive_findings
     ]
     suppression_notes = {
-        composition.attribute: "Suppressed due to minimum-base policy."
-        for composition in report.segment_composition
-        if any(segment.suppressed for segment in composition.segments)
+        segment.attribute: segment.suppression_reason or "Suppressed due to minimum-base policy."
+        for question in report.questions
+        for segment in question.segment_cuts
+        if segment.suppressed
     }
     claim_texts = [
         report.executive_summary,
@@ -764,7 +767,16 @@ def _derive_typed_answer_issues(report: ReportModel) -> list[str]:
 
 
 def _derive_sections_present(report: ReportModel) -> list[str]:
-    sections = ["title", "executive_summary", "question_results", "attrition", "limitations", "provenance", "appendix"]
+    sections = [
+        "title",
+        "executive_summary",
+        "question_results",
+        "attrition",
+        "fieldwork_handoff",
+        "limitations",
+        "provenance",
+        "appendix",
+    ]
     if report.methodology is not None:
         sections.append("methodology")
     if report.research_design is not None:

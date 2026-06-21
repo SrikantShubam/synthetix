@@ -139,6 +139,128 @@ class StandardsAlignment(BaseModel):
     icc_esomar: list[str] = Field(default_factory=list)
 
 
+class ResearchIntake(BaseModel):
+    mode: Literal["novice", "professional"] = "novice"
+    source_type: str = "structured_blueprint"
+    research_context: str = ""
+    target_population_summary: str = ""
+    target_population_size: int | None = Field(default=None, ge=1)
+    source_sample_size: int | None = Field(default=None, ge=1)
+    intended_synthetic_panel_size: int = Field(default=1, ge=1)
+    constraints: list[str] = Field(default_factory=list)
+    design_choices: list[str] = Field(default_factory=list)
+    questionnaire_signals: list[str] = Field(default_factory=list)
+    segment_variables: list[str] = Field(default_factory=list)
+    expected_analyses: list[str] = Field(default_factory=list)
+    unresolved_gaps: list[str] = Field(default_factory=list)
+    question_rationales: dict[str, str] = Field(default_factory=dict)
+    extraction_confidence: Literal["low", "medium", "high"] = "medium"
+    extraction_method: str = "derived_from_blueprint"
+    external_processing_used: bool = False
+    source_mode: Literal["derived", "explicit", "confirmed"] = "explicit"
+
+    @classmethod
+    def derive_from_blueprint(
+        cls,
+        *,
+        title: str,
+        purpose: str,
+        population: PopulationSpec,
+        questions: list[Question],
+        research_design: "ResearchDesign",
+    ) -> "ResearchIntake":
+        question_rationales: dict[str, str] = {}
+        for question in questions:
+            role = research_design.question_role_map.get(question.id, "driver")
+            if question.type == "choice":
+                rationale = f"{role.replace('_', ' ').title()} measure captured through a closed-ended choice."
+            elif question.type == "likert":
+                rationale = f"{role.replace('_', ' ').title()} intensity measure captured on a numeric scale."
+            else:
+                rationale = f"{role.replace('_', ' ').title()} follow-up captured in the respondent's own words."
+            question_rationales[question.id] = rationale
+
+        target_population_parts = [
+            *research_design.target_population_definition.inclusion_rules,
+            research_design.target_population_definition.unit_of_analysis,
+            research_design.target_population_definition.geography,
+            research_design.target_population_definition.timeframe,
+        ]
+        target_population_summary = "; ".join(part for part in target_population_parts if part).strip("; ")
+
+        expected_analyses = (
+            list(research_design.analysis_plan.toplines)
+            + list(research_design.analysis_plan.cross_tabs)
+            + list(research_design.analysis_plan.theme_coding)
+            + list(research_design.analysis_plan.sensitivity_checks)
+        )
+        unresolved_gaps = list(
+            research_design.sampling_or_simulation_frame.uncovered_groups
+            or ["Target/source sample size is not explicitly specified in the structured blueprint."]
+        )
+        return cls(
+            mode="professional" if research_design.requires_professional_quality_gate() else "novice",
+            source_type="structured_blueprint",
+            research_context=purpose or title,
+            target_population_summary=target_population_summary
+            or "Synthetic personas sampled from the declared blueprint population.",
+            intended_synthetic_panel_size=population.size,
+            constraints=list(research_design.assumptions),
+            design_choices=list(research_design.decision_questions),
+            questionnaire_signals=[question.prompt for question in questions[:3]],
+            segment_variables=list(research_design.segmentation_plan.segment_variables),
+            expected_analyses=expected_analyses,
+            unresolved_gaps=unresolved_gaps,
+            question_rationales=question_rationales,
+            extraction_confidence="high",
+            extraction_method="derived_from_blueprint",
+            external_processing_used=False,
+            source_mode="derived",
+        )
+
+    def validate_for_question_ids(
+        self,
+        question_ids: list[str],
+        *,
+        professional_required: bool,
+    ) -> None:
+        if self.intended_synthetic_panel_size < 1:
+            raise ValueError("ResearchIntake must declare a positive intended synthetic panel size")
+        if not professional_required:
+            return
+        missing = []
+        if not self.research_context.strip():
+            missing.append("research_context")
+        if not self.target_population_summary.strip():
+            missing.append("target_population_summary")
+        if not self.segment_variables:
+            missing.append("segment_variables")
+        if not self.expected_analyses:
+            missing.append("expected_analyses")
+        if self.source_mode in {"explicit", "confirmed"} and (
+            self.target_population_size is None and self.source_sample_size is None
+        ):
+            missing.append("target_or_source_scale")
+        if missing:
+            raise ValueError(
+                "Professional ResearchIntake is missing required fields: " + ", ".join(missing)
+            )
+        missing_rationales = [
+            question_id
+            for question_id in question_ids
+            if not self.question_rationales.get(question_id, "").strip()
+        ]
+        if missing_rationales:
+            raise ValueError(
+                "Professional ResearchIntake is missing question rationales for: "
+                + ", ".join(missing_rationales)
+            )
+        if self.extraction_confidence == "low":
+            raise ValueError(
+                "Professional ResearchIntake cannot rely on low-confidence document extraction"
+            )
+
+
 class ResearchDesign(BaseModel):
     study_type: Literal[
         "preliminary_simulation",
@@ -371,6 +493,7 @@ class SimulationBlueprint(BaseModel):
     model: ModelSelection = Field(default_factory=ModelSelection)
     questions: list[Question] = Field(min_length=1, max_length=100)
     research_design: ResearchDesign | None = None
+    research_intake: ResearchIntake | None = None
     limitations: list[str] = Field(default_factory=list)
 
     @model_validator(mode="after")
@@ -385,7 +508,23 @@ class SimulationBlueprint(BaseModel):
                 population=self.population,
                 questions=self.questions,
             )
+        if self.research_intake is None:
+            self.research_intake = ResearchIntake.derive_from_blueprint(
+                title=self.title,
+                purpose=self.purpose,
+                population=self.population,
+                questions=self.questions,
+                research_design=self.research_design,
+            )
         self.research_design.validate_for_question_ids(ids)
+        self.research_intake.validate_for_question_ids(
+            ids,
+            professional_required=self.research_design.requires_professional_quality_gate(),
+        )
+        if self.research_intake.intended_synthetic_panel_size != self.population.size:
+            raise ValueError(
+                "ResearchIntake intended_synthetic_panel_size must match population.size"
+            )
         return self
 
     def canonical_json(self) -> str:

@@ -134,7 +134,7 @@ Synthetix is a self-hosted synthetic scenario-exploration and survey simulation 
 - `06-agent-orchestrator-loop`: accepted.
 - `07-honest-predictor-improvement`: active; leakage-sensitive predictor work remains under review.
 - `08-rich-reporting-upgrade`: active; professional report depth criteria are stricter but rich generation is not complete.
-- `09-research-design-study-plan`: planned as the next high-judgment task before professional report quality can be accepted.
+- `09-research-design-study-plan`: active and now executed through an intake-first vertical slice. `ResearchIntake` precedes `ResearchDesign` for document/questionnaire ingestion, professional PDF intake enforces explicit OCR confidence rules, and reports now disclose intake scale, chart decisions, and fieldwork handoff.
 
 ## Current Evaluation State
 
@@ -146,8 +146,8 @@ Synthetix is a self-hosted synthetic scenario-exploration and survey simulation 
 
 ## Next High-Value Work
 
-1. Implement `09-research-design-study-plan` so every professional report is driven by objectives, assumptions, target population, segmentation, analysis plan, qualitative coding plan, and standards-aligned disclosure.
-2. Continue rich reporting only after the ResearchDesign contract exists, so report depth is judged against planned objectives and analyses rather than headings alone.
+1. Replace remaining weak examples and benchmark-adjacent fixtures with golden-path intake fixtures that explicitly cover novice, professional, and bad-input document cases.
+2. Continue rich reporting only after the intake-first contract is used by the shipped examples and objective-coverage/report-depth outputs remain strong under those fixtures.
 3. Author and review locked holdout target JSON fixtures with source PDF hash validation.
 4. Run holdout actual-vs-predicted only after the target fixtures are locked.
 5. Keep all benchmark and report changes inside the scientific boundary.

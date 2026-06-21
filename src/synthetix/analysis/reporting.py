@@ -8,6 +8,7 @@ from synthetix.execution.manifest import RunManifest
 from synthetix.execution.models import AttemptStatus, RunResult
 from synthetix.reporting.models import (
     AnalyticsChart,
+    ChartDecision,
     DenominatorSummary,
     Distribution,
     ExecutiveFinding,
@@ -419,6 +420,7 @@ def _build_segment_cuts(
                         value=value,
                         base_count=base_count,
                         suppressed=True,
+                        suppression_reason="Suppressed because the segment base is below the minimum threshold.",
                     )
                 )
                 continue
@@ -560,6 +562,28 @@ def _build_question_chart(report: QuestionReport) -> AnalyticsChart | None:
     return None
 
 
+def _chart_decision(report: QuestionReport) -> ChartDecision:
+    if report.denominators.valid_responses < MIN_SEGMENT_BASE:
+        return ChartDecision(
+            status="suppressed",
+            reason="Question base is too small for a stable chart.",
+        )
+    if report.question_type in {"choice", "likert"} and report.distribution.labels:
+        return ChartDecision(
+            status="rendered",
+            reason="Closed-ended distribution has a stable base and chart-safe categorical labels.",
+        )
+    if report.question_type == "open_text" and report.themes:
+        return ChartDecision(
+            status="replaced_with_evidence_panel",
+            reason="Open-text evidence is better shown through coded themes and quotes than a raw chart.",
+        )
+    return ChartDecision(
+        status="replaced_with_table",
+        reason="No chart-safe series was available for this question.",
+    )
+
+
 def _build_question_report(
     question: Question,
     *,
@@ -587,6 +611,10 @@ def _build_question_report(
             ),
             quote_evidence=quote_evidence,
             segment_cuts=_build_segment_cuts(question, succeeded_respondents, population_attributes),
+            chart_decision=ChartDecision(
+                status="rendered",
+                reason="Closed-ended distribution has a stable base and chart-safe categorical labels.",
+            ),
         )
 
     if question.type == "likert":
@@ -607,6 +635,10 @@ def _build_question_report(
             ),
             quote_evidence=quote_evidence,
             segment_cuts=_build_segment_cuts(question, succeeded_respondents, population_attributes),
+            chart_decision=ChartDecision(
+                status="rendered",
+                reason="Closed-ended distribution has a stable base and chart-safe categorical labels.",
+            ),
         )
 
     quote_evidence, themes = _build_open_text_evidence(question, answered_respondents)
@@ -627,6 +659,14 @@ def _build_question_report(
         quote_evidence=quote_evidence,
         themes=themes,
         segment_cuts=_build_segment_cuts(question, succeeded_respondents, population_attributes),
+        chart_decision=ChartDecision(
+            status="replaced_with_evidence_panel" if themes else "replaced_with_table",
+            reason=(
+                "Open-text evidence is better shown through coded themes and quotes than a raw chart."
+                if themes
+                else "No chart-safe qualitative summary was available."
+            ),
+        ),
     )
 
 
@@ -731,10 +771,6 @@ def build_report(
         )
         for question in blueprint.questions
     ]
-    question_reports = [
-        report.model_copy(update={"chart": _build_question_chart(report)})
-        for report in question_reports
-    ]
     failures: defaultdict[str, int] = defaultdict(int)
     retries = 0
     for respondent in result.respondents:
@@ -747,6 +783,19 @@ def build_report(
         succeeded_respondents,
         blueprint.population.attributes,
     )
+    question_reports = [
+        report.model_copy(
+            update={
+                "chart_decision": report.chart_decision or _chart_decision(report),
+                "chart": (
+                    _build_question_chart(report)
+                    if (report.chart_decision or _chart_decision(report)).status == "rendered"
+                    else None
+                ),
+            }
+        )
+        for report in question_reports
+    ]
     return ReportModel(
         run_id=result.run_id,
         title=blueprint.title,
@@ -763,11 +812,13 @@ def build_report(
             population_charts=_build_population_charts(segment_composition),
         ),
         research_design=blueprint.research_design,
+        research_intake=blueprint.research_intake,
         objective_coverage=_build_objective_coverage(blueprint, question_reports),
         sensitivity_notes=[
             "Small synthetic populations can overstate apparent consensus.",
             "Changing the model, provider, or seed can materially alter outputs.",
         ],
+        fieldwork_handoff=_build_fieldwork_handoff(blueprint),
         methodology=MethodologySummary(
             approach="Synthetic persona scenario exploration with deterministic aggregation.",
             response_generation=(
@@ -809,3 +860,27 @@ def build_report(
         ],
         manifest=manifest.model_dump(mode="json"),
     )
+
+
+def _build_fieldwork_handoff(blueprint: SimulationBlueprint) -> list[str]:
+    handoff = [
+        "Use this dry run to refine wording, segment rules, and the human fieldwork plan before external decisions."
+    ]
+    research_intake = blueprint.research_intake
+    if research_intake is not None and research_intake.target_population_size is not None:
+        handoff.append(
+            "Do not treat "
+            f"{research_intake.intended_synthetic_panel_size} synthetic respondents as representative of the "
+            f"{research_intake.target_population_size}-person target population."
+        )
+    elif research_intake is not None and research_intake.source_sample_size is not None:
+        handoff.append(
+            "Do not treat "
+            f"{research_intake.intended_synthetic_panel_size} synthetic respondents as equivalent to the "
+            f"{research_intake.source_sample_size}-response source study."
+        )
+    else:
+        handoff.append("Target/source scale is incomplete; human fieldwork planning still needs explicit population sizing.")
+    if research_intake is not None and research_intake.unresolved_gaps:
+        handoff.extend(research_intake.unresolved_gaps[:2])
+    return handoff
