@@ -311,6 +311,7 @@ def test_report_pipeline_renders_executive_and_appendix_sections(
     assert "Population composition" in html
     assert "Research design" in html
     assert "Question distributions" in html
+    assert "Question interpretation and implications" in html
     assert "Segment comparisons" in html
     assert "Qualitative themes and evidence" in html
     assert "Failures and sensitivity" in html
@@ -319,6 +320,7 @@ def test_report_pipeline_renders_executive_and_appendix_sections(
     assert "Provenance" in html
     assert "Limitations" in html
     assert "Standards-aligned disclosure appendix" in html
+    assert "Quote evidence appendix" in html
     assert "Technical appendix" in html
     assert "Figure 1." in html
     assert "Table 1." in html
@@ -334,6 +336,8 @@ def test_report_pipeline_renders_executive_and_appendix_sections(
     assert "Objective coverage" in text
     assert "Technical appendix" in text
     assert "Non-inferential use warning" in text
+    assert "Question interpretation and implications" in text
+    assert "Quote evidence appendix" in text
 
     second_run = render_report(report, tmp_path / "repeat")
     first_chart_bytes = [path.read_bytes() for path in artifacts.chart_paths]
@@ -415,6 +419,22 @@ def test_report_pipeline_uses_semantic_theme_labels_for_qualitative_summary(
     assert "Price sensitivity and value concern" in html
     assert "Price would require a very obvious payback story." in html
     assert "most repeated exact-response wording" not in html.casefold()
+
+
+def test_report_pipeline_renders_planned_vs_delivered_and_quote_evidence(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    _install_fake_weasyprint(monkeypatch)
+    report = _rich_report()
+
+    artifacts = render_report(report, tmp_path)
+    html = artifacts.html_path.read_text(encoding="utf-8")
+
+    assert "Delivered evidence" in html
+    assert "Residual gap" in html
+    assert "Use this evidence to inform" in html
+    assert "q2:p1" in html
+    assert "Price sensitivity and value concern" in html
 
 
 def test_report_pipeline_wraps_long_chart_labels_for_choice_questions(

@@ -136,8 +136,8 @@ REPORT_TEMPLATE = """
       </table>
     </section>
 
-    <section id="question-distributions" class="report-section">
-      <h2>Question distributions</h2>
+	    <section id="question-distributions" class="report-section">
+	      <h2>Question distributions</h2>
       {% for question in view.questions %}
       <article class="question-block">
         <div class="question-header">
@@ -179,8 +179,22 @@ REPORT_TEMPLATE = """
         </div>
         {% endif %}
       </article>
-      {% endfor %}
-    </section>
+	      {% endfor %}
+	    </section>
+
+	    <section id="question-interpretation" class="report-section">
+	      <h2>Question interpretation and implications</h2>
+	      {% for item in view.question_interpretations %}
+	      <article class="interpretation-card">
+	        <h3>{{ item.question_id }}: {{ item.role }}</h3>
+	        <p><strong>What was measured:</strong> {{ item.measurement }}</p>
+	        <p><strong>Observed pattern:</strong> {{ item.pattern }}</p>
+	        <p><strong>Interpretation:</strong> {{ item.interpretation }}</p>
+	        <p><strong>Decision implication:</strong> {{ item.decision_implication }}</p>
+	        <p><strong>Quality note:</strong> {{ item.quality_note }}</p>
+	      </article>
+	      {% endfor %}
+	    </section>
 
     <section id="segment-comparisons" class="report-section">
       <h2>Segment comparisons</h2>
@@ -270,8 +284,8 @@ REPORT_TEMPLATE = """
       {% endif %}
     </section>
 
-    <section id="objective-coverage" class="report-section">
-      <h2>Objective coverage</h2>
+	    <section id="objective-coverage" class="report-section">
+	      <h2>Objective coverage</h2>
       <table class="report-table">
         <caption>Table {{ view.objective_coverage_table_number }}. Planned objectives and delivered evidence.</caption>
         <thead>
@@ -288,8 +302,16 @@ REPORT_TEMPLATE = """
           </tr>
         {% endfor %}
         </tbody>
-      </table>
-    </section>
+	      </table>
+	      {% for row in view.planned_vs_delivered %}
+	      <article class="interpretation-card">
+	        <h3>{{ row.objective }}</h3>
+	        <p><strong>Decision question:</strong> {{ row.decision_question }}</p>
+	        <p><strong>Delivered evidence:</strong> {{ row.delivered_evidence }}</p>
+	        <p><strong>Residual gap:</strong> {{ row.residual_gap }}</p>
+	      </article>
+	      {% endfor %}
+	    </section>
 
     <section id="provenance" class="report-section">
       <h2>Provenance</h2>
@@ -312,18 +334,37 @@ REPORT_TEMPLATE = """
       </ul>
     </section>
 
-    <section id="standards-alignment-appendix" class="report-section">
-      <h2>Standards-aligned disclosure appendix</h2>
-      <p>{{ view.standards_alignment.summary }}</p>
+	    <section id="standards-alignment-appendix" class="report-section">
+	      <h2>Standards-aligned disclosure appendix</h2>
+	      <p>{{ view.standards_alignment.summary }}</p>
       <ul>
       {% for item in view.standards_alignment.disclosure_items %}
         <li>{{ item }}</li>
       {% endfor %}
       </ul>
-      <p><strong>Benchmark wording:</strong> {{ view.standards_alignment.benchmark_wording }}</p>
-    </section>
+	      <p><strong>Benchmark wording:</strong> {{ view.standards_alignment.benchmark_wording }}</p>
+	    </section>
 
-    <section id="technical-appendix" class="report-section page-break">
+	    <section id="quote-evidence-appendix" class="report-section page-break">
+	      <h2>Quote evidence appendix</h2>
+	      <p>This appendix preserves the synthetic response evidence used for theme coding and finding support. Quote IDs are deterministic and tie each quote back to the question and synthetic persona.</p>
+	      {% for block in view.quote_evidence_blocks %}
+	      <h3>{{ block.question_id }}</h3>
+	      <table class="report-table">
+	        <caption>Quote evidence for {{ block.question_id }}.</caption>
+	        <thead>
+	          <tr><th scope="col">Quote ID</th><th scope="col">Attributes</th><th scope="col">Text</th></tr>
+	        </thead>
+	        <tbody>
+	        {% for row in block.rows %}
+	          <tr><td>{{ row.quote_id }}</td><td>{{ row.attributes }}</td><td>{{ row.text }}</td></tr>
+	        {% endfor %}
+	        </tbody>
+	      </table>
+	      {% endfor %}
+	    </section>
+
+	    <section id="technical-appendix" class="report-section page-break">
       <h2>Technical appendix</h2>
       <h3>Immutable manifest</h3>
       <pre class="code-block">{{ view.manifest_json }}</pre>
@@ -669,6 +710,72 @@ def _build_questions(payload: dict[str, Any]) -> list[dict[str, Any]]:
     return views
 
 
+def _top_response_text(question: dict[str, Any]) -> str:
+    labels = [_coerce_text(label) for label in _coerce_list(question.get("labels"))]
+    values = [_coerce_int(value) for value in _coerce_list(question.get("values"))]
+    denominator = _coerce_int(question.get("denominator"))
+    if labels and values:
+        top_index = max(range(len(values)), key=values.__getitem__)
+        return f"{labels[top_index]} was the most common valid response ({values[top_index]}/{denominator})."
+    themes = [_coerce_mapping(theme) for theme in _coerce_list(question.get("themes"))]
+    if themes:
+        top_theme = max(themes, key=lambda theme: _coerce_int(theme.get("count")))
+        return (
+            f"{_coerce_text(top_theme.get('label'))} was the leading coded theme "
+            f"({_coerce_int(top_theme.get('count'))}/{denominator})."
+        )
+    return "No valid pattern was available for interpretation."
+
+
+def _build_question_interpretations(payload: dict[str, Any], questions: list[dict[str, Any]]) -> list[dict[str, str]]:
+    research_design = _coerce_mapping(payload.get("research_design"))
+    roles = _coerce_mapping(research_design.get("question_role_map"))
+    decision_questions = [
+        _coerce_text(item)
+        for item in _coerce_list(research_design.get("decision_questions"))
+        if _coerce_text(item)
+    ]
+    decision_text = "; ".join(decision_questions) or "Use as exploratory input before fieldwork."
+    interpretations: list[dict[str, str]] = []
+    for question in questions:
+        question_id = _coerce_text(question.get("question_id"))
+        question_type = _coerce_text(question.get("question_type"))
+        role = _coerce_text(roles.get(question_id), "unmapped")
+        pattern = _top_response_text(question)
+        if question_type in {"choice", "likert"}:
+            measurement = (
+                "This closed-ended item captures a bounded synthetic response pattern. "
+                "The denominator is the count of valid synthetic answers after type validation."
+            )
+            quality_note = (
+                "Closed-ended labels are treated as measurement categories only; rationale belongs in a separate qualitative probe."
+            )
+        else:
+            measurement = (
+                "This qualitative item captures rationale or diagnostic feedback. Themes are coded from synthetic quotes and retain quote IDs."
+            )
+            quality_note = (
+                "Theme counts indicate repeated synthetic rationale patterns, not population prevalence or statistical significance."
+            )
+        interpretations.append(
+            {
+                "question_id": question_id,
+                "role": role.replace("_", " "),
+                "measurement": measurement,
+                "pattern": pattern,
+                "interpretation": (
+                    f"The observed pattern supports the '{role.replace('_', ' ')}' role by showing where "
+                    "synthetic respondents converge and where additional human validation would be needed."
+                ),
+                "decision_implication": (
+                    f"Use this evidence to inform: {decision_text}. Any launch, pricing, or fieldwork decision requires human validation."
+                ),
+                "quality_note": quality_note,
+            }
+        )
+    return interpretations
+
+
 def _build_segment_comparisons(questions: list[dict[str, Any]], start_table_number: int) -> list[dict[str, Any]]:
     comparisons: list[dict[str, Any]] = []
     table_number = start_table_number
@@ -719,8 +826,8 @@ def _build_qualitative_themes(payload: dict[str, Any]) -> list[dict[str, Any]]:
                 {
                     "theme": _coerce_text(theme.get("label"), "Theme"),
                     "summary": (
-                        f"Repeated exact-response wording for { _coerce_text(question_row.get('question_id')) } "
-                        f"appeared { _coerce_int(theme.get('count')) } times."
+                        f"The coded theme for { _coerce_text(question_row.get('question_id')) } "
+                        f"appeared in { _coerce_int(theme.get('count')) } traceable synthetic responses."
                     ),
                     "evidence": [
                         _coerce_text(entry)
@@ -729,6 +836,60 @@ def _build_qualitative_themes(payload: dict[str, Any]) -> list[dict[str, Any]]:
                 }
             )
     return views
+
+
+def _build_planned_vs_delivered(payload: dict[str, Any]) -> list[dict[str, str]]:
+    rows: list[dict[str, str]] = []
+    for item in _coerce_list(payload.get("objective_coverage")):
+        coverage = _coerce_mapping(item)
+        covered_questions = [
+            _coerce_text(question_id)
+            for question_id in _coerce_list(coverage.get("covered_question_ids"))
+            if _coerce_text(question_id)
+        ]
+        status = _coerce_text(coverage.get("status"), "unknown")
+        rows.append(
+            {
+                "objective": _coerce_text(coverage.get("objective")),
+                "decision_question": _coerce_text(coverage.get("decision_question")),
+                "delivered_evidence": (
+                    f"Covered by {', '.join(covered_questions)} with status {status}. "
+                    f"{_coerce_text(coverage.get('notes'))}"
+                ),
+                "residual_gap": (
+                    "No inferential or representative claim is supported; the next step is human fieldwork "
+                    "or a larger calibrated benchmark before operational decisions."
+                ),
+            }
+        )
+    return rows
+
+
+def _build_quote_evidence_blocks(payload: dict[str, Any]) -> list[dict[str, Any]]:
+    blocks: list[dict[str, Any]] = []
+    for question in _coerce_list(payload.get("questions")):
+        question_row = _coerce_mapping(question)
+        quote_rows = []
+        for quote in _coerce_list(question_row.get("quote_evidence")):
+            quote_row = _coerce_mapping(quote)
+            attributes = _coerce_mapping(quote_row.get("attributes"))
+            quote_rows.append(
+                {
+                    "quote_id": _coerce_text(quote_row.get("quote_id")),
+                    "attributes": "; ".join(
+                        f"{key}={value}" for key, value in sorted(attributes.items())
+                    ),
+                    "text": _coerce_text(quote_row.get("text")),
+                }
+            )
+        if quote_rows:
+            blocks.append(
+                {
+                    "question_id": _coerce_text(question_row.get("question_id")),
+                    "rows": quote_rows,
+                }
+            )
+    return blocks
 
 
 def _build_objective_coverage(payload: dict[str, Any]) -> list[dict[str, str]]:
@@ -849,9 +1010,10 @@ def _build_report_view(payload: dict[str, Any]) -> dict[str, Any]:
         "population_summary": population_summary,
         "population_rows": population_rows,
         "population_table_number": 1,
-        "questions": questions,
-        "segment_comparisons": segment_comparisons,
-        "qualitative_themes": _build_qualitative_themes(payload),
+	        "questions": questions,
+	        "question_interpretations": _build_question_interpretations(payload, questions),
+	        "segment_comparisons": segment_comparisons,
+	        "qualitative_themes": _build_qualitative_themes(payload),
         "failures": {
             "total_personas": _coerce_int(failures.get("total_personas")),
             "succeeded": _coerce_int(failures.get("succeeded")),
@@ -865,14 +1027,16 @@ def _build_report_view(payload: dict[str, Any]) -> dict[str, Any]:
             for item in _coerce_list(payload.get("sensitivity_notes"))
         ],
         "methodology": _build_methodology(payload, provenance),
-        "objective_coverage": objective_coverage,
+	        "objective_coverage": objective_coverage,
+	        "planned_vs_delivered": _build_planned_vs_delivered(payload),
         "objective_coverage_table_number": objective_coverage_table_number,
         "provenance_rows": _build_provenance_rows(provenance),
         "provenance_table_number": provenance_table_number,
         "token_usage": _coerce_int(payload.get("token_usage")),
         "cost_usd": _coerce_float(payload.get("cost_usd")),
         "limitations": [_coerce_text(item) for item in _coerce_list(payload.get("limitations"))],
-        "standards_alignment": _build_standards_alignment(payload),
+	        "standards_alignment": _build_standards_alignment(payload),
+	        "quote_evidence_blocks": _build_quote_evidence_blocks(payload),
         "manifest_json": json.dumps(
             _coerce_mapping(payload.get("manifest")),
             indent=2,
@@ -883,16 +1047,18 @@ def _build_report_view(payload: dict[str, Any]) -> dict[str, Any]:
             {"id": "executive-findings", "label": "Executive findings"},
             {"id": "research-design", "label": "Research design"},
             {"id": "population-composition", "label": "Population composition"},
-            {"id": "question-distributions", "label": "Question distributions"},
-            {"id": "segment-comparisons", "label": "Segment comparisons"},
+	            {"id": "question-distributions", "label": "Question distributions"},
+	            {"id": "question-interpretation", "label": "Question interpretation and implications"},
+	            {"id": "segment-comparisons", "label": "Segment comparisons"},
             {"id": "qualitative-themes", "label": "Qualitative themes and evidence"},
             {"id": "failures-sensitivity", "label": "Failures and sensitivity"},
             {"id": "methodology", "label": "Methodology"},
             {"id": "objective-coverage", "label": "Objective coverage"},
             {"id": "provenance", "label": "Provenance"},
             {"id": "limitations", "label": "Limitations"},
-            {"id": "standards-alignment-appendix", "label": "Standards-aligned disclosure appendix"},
-            {"id": "technical-appendix", "label": "Technical appendix"},
+	            {"id": "standards-alignment-appendix", "label": "Standards-aligned disclosure appendix"},
+	            {"id": "quote-evidence-appendix", "label": "Quote evidence appendix"},
+	            {"id": "technical-appendix", "label": "Technical appendix"},
         ],
     }
 

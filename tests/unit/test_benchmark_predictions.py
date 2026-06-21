@@ -348,3 +348,41 @@ def test_prediction_emitter_uses_conservative_semantic_priors_without_answer_key
         {"metric_id": "lgbtq_discrimination", "value": 0.28},
         {"metric_id": "nordic_climate_score", "value": 4.1},
     ]
+
+
+def test_prediction_emitter_uses_wvs_value_question_prior_without_answer_keys() -> None:
+    fixture = {
+        "fixture_id": "dev_wvs_values",
+        "source_strategy": "development-only WVS-derived values survey",
+        "population_definition": {
+            "target_population": "cross-cultural respondents represented through WVS wave 7",
+            "target_sample_size": 93312,
+        },
+        "questionnaire_or_task": {
+            "task_type": "survey_response_replication",
+            "example_constructs": [
+                "institutional trust",
+                "technology optimism",
+                "fairness perceptions",
+                "religiosity and traditional versus secular-rational orientation",
+                "survival versus self-expression values",
+            ],
+        },
+        "prediction_contract": {
+            "metrics": [
+                {"metric_id": "value_question_count", "unit": "count"},
+            ]
+        },
+        "actual_targets": [
+            {"metric_id": "value_question_count", "label": "Value question count", "value": 999, "unit": "count"}
+        ],
+        "human_reference_summary": {
+            "reported_sample_or_scale": "answer-bearing text must be ignored"
+        },
+    }
+
+    payload = DevelopmentPredictionEmitter.emit_fixture(fixture)
+
+    assert payload["predicted_metrics"] == [
+        {"metric_id": "value_question_count", "value": 36.0},
+    ]

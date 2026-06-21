@@ -94,3 +94,46 @@ def test_quality_loop_uses_report_task_when_report_artifacts_missing(tmp_path: P
     assert result.next_task is not None
     assert result.next_task.task_id == "improve-professional-report"
     assert result.next_task.assigned_model == "gpt-5.4"
+
+
+def test_quality_loop_creates_repair_task_for_failed_report_hard_gates(tmp_path: Path) -> None:
+    _write_json(
+        tmp_path / "data/benchmark-results/development/summary.json",
+        {
+            "fixture_count": 1,
+            "reports": [{"fixture_id": "a", "summary": {"score": 1.0, "mean_absolute_error": 0.0}}],
+        },
+    )
+    report_dir = tmp_path / "data/run-1"
+    report_dir.mkdir(parents=True)
+    for name in ("report.json", "report.html", "report.pdf", "checksums.json"):
+        (report_dir / name).write_text("present", encoding="utf-8")
+    _write_json(
+        report_dir / "quality.json",
+        {
+            "accepted": False,
+            "hard_gates": [
+                {"name": "typed_answer_integrity", "passed": True},
+                {"name": "professional_report_depth", "passed": False},
+                {"name": "qualitative_reasoning_depth", "passed": False},
+            ],
+        },
+    )
+    loop = QualityLoop.for_workspace(
+        tmp_path,
+        state_path=tmp_path / "data/quality-loop-state.json",
+        progress_path=tmp_path / "docs/progress/quality-loop-progress.md",
+        target=QualityTarget(require_report_artifacts=True),
+    )
+
+    result = loop.run_once()
+
+    assert result.passed is False
+    assert result.next_task is not None
+    assert result.next_task.task_id == "repair-professional-report-quality"
+    assert result.next_task.assigned_model == "gpt-5.4"
+    assert result.metrics.failed_report_gates == [
+        "professional_report_depth",
+        "qualitative_reasoning_depth",
+    ]
+    assert "professional_report_depth" in result.reason

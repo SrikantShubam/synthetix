@@ -674,11 +674,20 @@ def _derive_report_depth(report: ReportModel, artifacts: ReportArtifacts) -> Rep
     table_count = len(re.findall(r"<table\b", html_text, flags=re.IGNORECASE))
     chart_count = len(artifacts.chart_paths) + len(report.analytics.population_charts)
     segment_cut_count = sum(len(question.segment_cuts) for question in report.questions)
-    qualitative_theme_count = sum(len(question.themes) for question in report.questions)
+    qualitative_theme_count = sum(
+        len(question.themes)
+        + sum(len(segment.themes) for segment in question.segment_cuts)
+        for question in report.questions
+    )
     traceable_quote_count = sum(
         len(theme.supporting_quote_ids)
         for question in report.questions
         for theme in question.themes
+    ) + sum(
+        len(theme.supporting_quote_ids)
+        for question in report.questions
+        for segment in question.segment_cuts
+        for theme in segment.themes
     ) + sum(len(question.quote_evidence) for question in report.questions)
     return ReportDepthEvidence(
         pdf_pages=_pdf_page_count(artifacts.pdf_path),

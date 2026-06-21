@@ -16,7 +16,7 @@ from synthetix.reporting.quality import (
     load_benchmark_registry,
 )
 from synthetix.reporting.models import ReportModel
-from synthetix.reporting.models import Distribution
+from synthetix.reporting.models import Distribution, SegmentCut, ThemeEvidence
 from synthetix.reporting.renderer import ReportArtifacts
 
 
@@ -368,6 +368,69 @@ def test_build_quality_input_flags_prose_labels_for_typed_questions(tmp_path: Pa
 
     assert input_model.typed_answer_issues
     assert "typed_answer_integrity" in score.failed_hard_gates
+
+
+def test_build_quality_input_counts_segment_level_qualitative_themes(tmp_path: Path) -> None:
+    base_question = ReportModel.example().questions[0]
+    report = ReportModel.example().model_copy(
+        update={
+            "questions": [
+                base_question.model_copy(
+                    update={
+                        "question_type": "open_text",
+                        "distribution": Distribution(),
+                        "themes": [
+                            ThemeEvidence(
+                                theme_id="q1:theme:1",
+                                label="Price sensitivity and value concern",
+                                count=2,
+                                supporting_quote_ids=["q1:p1", "q1:p2"],
+                            )
+                        ],
+                        "segment_cuts": [
+                            SegmentCut(
+                                attribute="region",
+                                value="urban",
+                                base_count=2,
+                                themes=[
+                                    ThemeEvidence(
+                                        theme_id="q1:theme:urban",
+                                        label="Convenience and workflow fit",
+                                        count=1,
+                                        supporting_quote_ids=["q1:p3"],
+                                    )
+                                ],
+                            )
+                        ],
+                    }
+                )
+            ]
+        }
+    )
+    (tmp_path / "report.json").write_text("{}", encoding="utf-8")
+    (tmp_path / "report.html").write_text(
+        "<html><body>Non-inferential synthetic evidence only.</body></html>",
+        encoding="utf-8",
+    )
+    (tmp_path / "report.pdf").write_bytes(b"%PDF-1.4\n")
+    (tmp_path / "checksums.json").write_text(
+        '{"report.json":"44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a","report.html":"","report.pdf":""}',
+        encoding="utf-8",
+    )
+
+    input_model = build_quality_input(
+        report,
+        ReportArtifacts(
+            json_path=tmp_path / "report.json",
+            html_path=tmp_path / "report.html",
+            pdf_path=tmp_path / "report.pdf",
+            checksums_path=tmp_path / "checksums.json",
+            chart_paths=[],
+        ),
+    )
+
+    assert input_model.report_depth.qualitative_theme_count == 2
+    assert input_model.report_depth.traceable_quote_count >= 3
 
 
 def test_benchmark_registry_metadata_is_authoritative_without_restricted_downloads() -> None:

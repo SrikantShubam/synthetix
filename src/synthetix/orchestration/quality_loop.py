@@ -18,6 +18,9 @@ class QualityMetrics(BaseModel):
     min_fixture_score: float
     failing_fixtures: list[str] = Field(default_factory=list)
     report_artifacts_present: bool
+    report_quality_path: str | None = None
+    report_accepted: bool = False
+    failed_report_gates: list[str] = Field(default_factory=list)
 
 
 class QualityTask(BaseModel):
@@ -110,6 +113,23 @@ class QualityLoop:
                 forbidden_paths=["research/source_of_truth", "data/benchmark-results/holdout"],
                 acceptance_checks=["report_artifacts", "report_quality", "unit_tests"],
             )
+        if self.target.require_report_artifacts and metrics.failed_report_gates:
+            return QualityTask(
+                task_id="repair-professional-report-quality",
+                assigned_model="gpt-5.4",
+                goal=(
+                    "Repair professional report quality gates: "
+                    + ", ".join(metrics.failed_report_gates)
+                ),
+                allowed_paths=["src/synthetix/reporting", "src/synthetix/analysis", "tests"],
+                forbidden_paths=["research/source_of_truth", "data/benchmark-results/holdout"],
+                acceptance_checks=[
+                    "professional_report_quality",
+                    "report_artifacts",
+                    "unit_tests",
+                    "integration_tests",
+                ],
+            )
         return None
 
     def _prediction_task(self) -> QualityTask:
@@ -146,6 +166,11 @@ class QualityLoop:
             )
         if self.target.require_report_artifacts and not metrics.report_artifacts_present:
             reasons.append("professional report artifacts missing")
+        if self.target.require_report_artifacts and metrics.failed_report_gates:
+            reasons.append(
+                "professional report quality gates failed: "
+                + ", ".join(metrics.failed_report_gates)
+            )
         return "; ".join(reasons)
 
     def _load_metrics(self) -> QualityMetrics:
@@ -157,6 +182,7 @@ class QualityLoop:
                 min_fixture_score=0.0,
                 failing_fixtures=["development_summary_missing"],
                 report_artifacts_present=self._report_artifacts_present(),
+                **self._report_quality_fields(),
             )
         summary = self._read_json(summary_path)
         reports = summary.get("reports", [])
@@ -167,6 +193,7 @@ class QualityLoop:
                 min_fixture_score=0.0,
                 failing_fixtures=["development_reports_missing"],
                 report_artifacts_present=self._report_artifacts_present(),
+                **self._report_quality_fields(),
             )
         scores: list[float] = []
         failing: list[str] = []
@@ -190,6 +217,7 @@ class QualityLoop:
             min_fixture_score=round(min(scores), 4),
             failing_fixtures=failing,
             report_artifacts_present=self._report_artifacts_present(),
+            **self._report_quality_fields(),
         )
 
     def _report_artifacts_present(self) -> bool:
@@ -202,6 +230,39 @@ class QualityLoop:
             for run_dir in data_dir.glob("**")
             if run_dir.is_dir()
         )
+
+    def _report_quality_fields(self) -> dict[str, object]:
+        quality_path = self._latest_report_quality_path()
+        if quality_path is None:
+            return {
+                "report_quality_path": None,
+                "report_accepted": False,
+                "failed_report_gates": ["report_quality_missing"],
+            }
+        quality = self._read_json(quality_path)
+        hard_gates = quality.get("hard_gates", [])
+        failed = [
+            str(gate.get("name", "unknown_gate"))
+            for gate in hard_gates
+            if isinstance(gate, dict) and gate.get("passed") is not True
+        ]
+        accepted = bool(quality.get("accepted")) and not failed
+        return {
+            "report_quality_path": str(quality_path.relative_to(self.workspace)),
+            "report_accepted": accepted,
+            "failed_report_gates": failed,
+        }
+
+    def _latest_report_quality_path(self) -> Path | None:
+        data_dir = self.workspace / "data"
+        if not data_dir.exists():
+            return None
+        candidates = sorted(
+            data_dir.glob("**/quality.json"),
+            key=lambda path: path.stat().st_mtime,
+            reverse=True,
+        )
+        return candidates[0] if candidates else None
 
     def _load_state(self) -> QualityLoopState:
         if self.state_path.exists():
@@ -227,6 +288,9 @@ class QualityLoop:
             progress_file.write(f"- minimum fixture score: `{metrics.min_fixture_score}`\n")
             progress_file.write(f"- failing fixtures: `{', '.join(metrics.failing_fixtures)}`\n")
             progress_file.write(f"- report artifacts present: `{metrics.report_artifacts_present}`\n")
+            progress_file.write(f"- report quality path: `{metrics.report_quality_path}`\n")
+            progress_file.write(f"- report accepted: `{metrics.report_accepted}`\n")
+            progress_file.write(f"- failed report gates: `{', '.join(metrics.failed_report_gates)}`\n")
             progress_file.write(f"- reason: {reason}\n")
             if task is not None:
                 progress_file.write(f"- next task: `{task.task_id}`\n")
