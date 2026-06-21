@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import html as html_lib
 import hashlib
 import json
 import re
@@ -116,6 +117,8 @@ class ReportQualityInput(BaseModel):
     sections_present: list[str] = Field(default_factory=list)
     artifact_checksums: list[ArtifactChecksum] = Field(default_factory=list)
     non_inferential_warning_present: bool = False
+    report_warnings: list[str] = Field(default_factory=list)
+    chart_decisions: list[dict[str, str]] = Field(default_factory=list)
     claim_texts: list[str] = Field(default_factory=list)
     attrition: AttritionEvidence = Field(default_factory=AttritionEvidence)
     report_depth: ReportDepthEvidence = Field(default_factory=ReportDepthEvidence)
@@ -132,6 +135,8 @@ class ReportQualityInput(BaseModel):
     standards_alignment_texts: list[str] = Field(default_factory=list)
     benchmark_wording_texts: list[str] = Field(default_factory=list)
     typed_answer_issues: list[str] = Field(default_factory=list)
+    rendered_text_artifacts: list[str] = Field(default_factory=list)
+    pdf_rendering_mode: str = "unknown"
 
 
 class HardGateResult(BaseModel):
@@ -142,6 +147,7 @@ class HardGateResult(BaseModel):
 
 class ReportQualityScore(BaseModel):
     total_score: float
+    raw_total_score: float
     threshold: float = PASSING_THRESHOLD
     passes_threshold: bool
     accepted: bool
@@ -180,7 +186,7 @@ class ReportQualityScorer:
 
     def evaluate(self, report_input: ReportQualityInput) -> ReportQualityScore:
         weighted_breakdown = report_input.category_scores.weighted_breakdown()
-        total_score = round(sum(weighted_breakdown.values()), 2)
+        raw_total_score = round(sum(weighted_breakdown.values()), 2)
         hard_gates = [
             self._check_typed_answer_integrity(report_input.typed_answer_issues),
             self._check_chart_labels(report_input.chart_labels),
@@ -194,7 +200,20 @@ class ReportQualityScorer:
             self._check_sections(report_input.sections_present),
             self._check_checksums(report_input.artifact_checksums),
             self._check_warning(report_input.non_inferential_warning_present),
+            self._check_report_warnings(
+                report_input.research_design_tier,
+                report_input.report_warnings,
+            ),
             self._check_inferential_claims(report_input.claim_texts),
+            self._check_chart_decisions(
+                report_input.research_design_tier,
+                report_input.chart_decisions,
+            ),
+            self._check_rendered_text_artifacts(report_input.rendered_text_artifacts),
+            self._check_pdf_rendering_mode(
+                report_input.research_design_tier,
+                report_input.pdf_rendering_mode,
+            ),
             self._check_attrition(report_input.attrition),
             self._check_report_depth(report_input.report_depth),
             self._check_research_design_requirement(report_input.research_design_tier),
@@ -216,10 +235,18 @@ class ReportQualityScorer:
             self._check_benchmark_wording(report_input.benchmark_wording_texts),
         ]
         all_gates_passed = all(gate.passed for gate in hard_gates)
+        failed_gate_count = sum(1 for gate in hard_gates if not gate.passed)
+        total_score = raw_total_score
+        if failed_gate_count:
+            total_score = round(
+                min(raw_total_score, max(0.0, self.passing_threshold - (10.0 * failed_gate_count) - 1.0)),
+                2,
+            )
         passes_threshold = total_score >= self.passing_threshold and all_gates_passed
         accepted = passes_threshold and all_gates_passed
         return ReportQualityScore(
             total_score=total_score,
+            raw_total_score=raw_total_score,
             threshold=self.passing_threshold,
             passes_threshold=passes_threshold,
             accepted=accepted,
@@ -345,6 +372,64 @@ class ReportQualityScorer:
             detail="No inferential claims were detected."
             if not claims
             else f"Inferential claims detected: {claims}",
+        )
+
+    def _check_report_warnings(self, tier: str, warnings: list[str]) -> HardGateResult:
+        passed = tier != "professional" or bool(warnings)
+        return HardGateResult(
+            name="report_contract_has_user_warnings",
+            passed=passed,
+            detail="Professional report contract exposes user-facing warnings."
+            if passed
+            else "Professional report is missing explicit user-facing warnings.",
+        )
+
+    def _check_chart_decisions(
+        self,
+        tier: str,
+        chart_decisions: list[dict[str, str]],
+    ) -> HardGateResult:
+        if tier != "professional":
+            return HardGateResult(
+                name="report_contract_has_chart_decisions",
+                passed=True,
+                detail="Chart decision contract is optional for lightweight exploration reports.",
+            )
+        missing = [
+            item.get("question_id", "unknown_question")
+            for item in chart_decisions
+            if not item.get("status") or not item.get("reason")
+        ]
+        passed = bool(chart_decisions) and not missing
+        return HardGateResult(
+            name="report_contract_has_chart_decisions",
+            passed=passed,
+            detail="Professional report exposes per-question chart decisions."
+            if passed
+            else (
+                "Professional report is missing top-level chart decisions."
+                if not chart_decisions
+                else f"Chart decisions missing status or reason for: {missing}"
+            ),
+        )
+
+    def _check_rendered_text_artifacts(self, artifacts: list[str]) -> HardGateResult:
+        return HardGateResult(
+            name="rendered_text_has_no_html_artifacts",
+            passed=not artifacts,
+            detail="Rendered report text is free of visible HTML entity artifacts."
+            if not artifacts
+            else "Rendered text artifacts detected: " + "; ".join(artifacts),
+        )
+
+    def _check_pdf_rendering_mode(self, tier: str, rendering_mode: str) -> HardGateResult:
+        passed = tier != "professional" or rendering_mode in {"weasyprint", "reportlab_structured"}
+        return HardGateResult(
+            name="professional_pdf_uses_production_renderer",
+            passed=passed,
+            detail="Professional PDF used the production renderer."
+            if passed
+            else f"Professional PDF used non-production rendering mode: {rendering_mode}.",
         )
 
     def _check_attrition(self, attrition: AttritionEvidence) -> HardGateResult:
@@ -565,9 +650,12 @@ def build_quality_input(report: ReportModel, artifacts: ReportArtifacts) -> Repo
     }
     claim_texts = [
         report.executive_summary,
+        *report.warnings,
         *[finding.summary for finding in report.executive_findings],
         *report.limitations,
     ]
+    html_text = artifacts.html_path.read_text(encoding="utf-8") if artifacts.html_path.exists() else ""
+    pdf_text = _pdf_text(artifacts.pdf_path)
     research_design = report.research_design
     target_population_summary = ""
     sampling_frame_summary = ""
@@ -636,11 +724,32 @@ def build_quality_input(report: ReportModel, artifacts: ReportArtifacts) -> Repo
             for path, expected in _expected_artifact_pairs(artifacts, checksums)
         ],
         non_inferential_warning_present=_contains_non_inferential_warning(
-            artifacts.html_path.read_text(encoding="utf-8")
-            if artifacts.html_path.exists()
-            else report.executive_summary
+            html_text or report.executive_summary
         ),
         claim_texts=claim_texts,
+        report_warnings=list(report.warnings),
+        chart_decisions=[
+            {
+                "question_id": str(item.question_id or ""),
+                "status": item.status,
+                "reason": item.reason,
+            }
+            for item in report.chart_decisions
+        ],
+        rendered_text_artifacts=_detect_rendered_text_artifacts(
+            html_text,
+            pdf_text,
+            warnings=list(report.warnings),
+            chart_decisions=[
+                {
+                    "question_id": str(item.question_id or ""),
+                    "status": item.status,
+                    "reason": item.reason,
+                }
+                for item in report.chart_decisions
+            ],
+        ),
+        pdf_rendering_mode=getattr(artifacts, "render_mode", "unknown"),
         attrition=AttritionEvidence(
             labels=["succeeded", *sorted(report.failures.classifications.keys())],
             counts={
@@ -711,6 +820,15 @@ def _pdf_page_count(path: Path) -> int:
         return len(PdfReader(path).pages)
     except Exception:
         return 0
+
+
+def _pdf_text(path: Path) -> str:
+    if not path.exists():
+        return ""
+    try:
+        return "\n".join((page.extract_text() or "") for page in PdfReader(path).pages)
+    except Exception:
+        return ""
 
 
 def _derive_category_scores(
@@ -787,6 +905,73 @@ def _derive_sections_present(report: ReportModel) -> list[str]:
 def _contains_non_inferential_warning(text: str) -> bool:
     lowered = text.casefold()
     return "non-inferential" in lowered or "do not infer prevalence" in lowered
+
+
+def _detect_rendered_text_artifacts(
+    html_text: str,
+    pdf_text: str,
+    *,
+    warnings: list[str],
+    chart_decisions: list[dict[str, str]],
+) -> list[str]:
+    artifacts: list[str] = []
+    visible_html = _visible_rendered_text(html_text)
+    visible_pdf = " ".join(pdf_text.casefold().split())
+
+    if _contains_visible_html_entities(visible_html):
+        artifacts.append("html_contains_visible_html_entities")
+    if _contains_visible_html_entities(visible_pdf):
+        artifacts.append("pdf_contains_visible_html_entities")
+
+    if warnings:
+        warning_markers = [warning.casefold() for warning in warnings]
+        if "report warnings and chart decisions" not in visible_html:
+            artifacts.append("html_missing_report_contract_section")
+        if "report warnings and chart decisions" not in visible_pdf:
+            artifacts.append("pdf_missing_report_contract_section")
+        if "report warnings" not in visible_html:
+            artifacts.append("html_missing_report_warning_heading")
+        if "report warnings" not in visible_pdf:
+            artifacts.append("pdf_missing_report_warning_heading")
+        if not any(marker in visible_html for marker in warning_markers):
+            artifacts.append("html_missing_report_warning_text")
+        if not any(marker in visible_pdf for marker in warning_markers):
+            artifacts.append("pdf_missing_report_warning_text")
+
+    if chart_decisions:
+        if "chart decision log" not in visible_html:
+            artifacts.append("html_missing_chart_decision_heading")
+        if "chart decision log" not in visible_pdf:
+            artifacts.append("pdf_missing_chart_decision_heading")
+        decision_markers = [
+            marker
+            for item in chart_decisions
+            for marker in (
+                item.get("question_id", "").casefold(),
+                item.get("status", "").casefold(),
+                item.get("reason", "").casefold(),
+            )
+            if marker
+        ]
+        if not any(marker in visible_html for marker in decision_markers):
+            artifacts.append("html_missing_chart_decision_text")
+        if not any(marker in visible_pdf for marker in decision_markers):
+            artifacts.append("pdf_missing_chart_decision_text")
+
+    return artifacts
+
+
+def _visible_rendered_text(html_text: str) -> str:
+    visible = html_lib.unescape(re.sub(r"<[^>]+>", " ", html_text))
+    return " ".join(visible.casefold().split())
+
+
+def _collapse_whitespace(value: str) -> str:
+    return " ".join(value.split())
+
+
+def _contains_visible_html_entities(text: str) -> bool:
+    return bool(re.search(r"&(?:amp|lt|gt|quot|apos|#\d+|#x[0-9a-f]+);", text))
 
 
 def _read_checksum_file(path: Path) -> dict[str, str]:

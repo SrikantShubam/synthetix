@@ -1,0 +1,184 @@
+{
+  "fixture_id": "val_golden_path_professional_manual_intake_v1",
+  "data_partition": "validation",
+  "evaluation_only": true,
+  "training_allowed": false,
+  "fixture_class": "professional_survey_dry_run",
+  "source_material": {
+    "format": "markdown_brief",
+    "title": "Professional accessibility workflow survey dry run",
+    "body": "Research context: professional pre-fieldwork dry run for an accessibility workflow survey. Target population: knowledge workers using internal workflow tooling across the United States. Target population size: 18000. Source sample size: 240. Intended synthetic panel size: 10. Segment variables: region, disability status, tenure band. Expected analyses: accessibility barrier topline, region cut, tenure cut, open-text friction themes. Constraints: synthetic evidence only, suppress slices below the minimum base, and keep target population scale separate from the synthetic panel."
+  },
+  "expected_contract_fields": [
+    {
+      "field": "research_context",
+      "expected_markers": [
+        "pre-fieldwork dry run",
+        "accessibility workflow survey",
+        "synthetic evidence only"
+      ],
+      "min_matches": 2
+    },
+    {
+      "field": "target_population",
+      "expected_markers": [
+        "knowledge workers",
+        "United States",
+        "internal workflow tooling"
+      ],
+      "min_matches": 2
+    },
+    {
+      "field": "sample_sizes",
+      "expected_markers": [
+        "18000",
+        "240",
+        "10"
+      ],
+      "min_matches": 3
+    },
+    {
+      "field": "segment_variables",
+      "expected_markers": [
+        "region",
+        "disability status",
+        "tenure band"
+      ],
+      "min_matches": 3
+    },
+    {
+      "field": "expected_analyses",
+      "expected_markers": [
+        "accessibility barrier topline",
+        "region cut",
+        "tenure cut",
+        "open-text friction themes"
+      ],
+      "min_matches": 4
+    }
+  ],
+  "expected_research_intake": {
+    "mode": "professional",
+    "source_type": "markdown_brief",
+    "research_context": "Professional accessibility workflow survey dry run before human fieldwork.",
+    "target_population_summary": "Knowledge workers using internal workflow tooling in the United States.",
+    "target_population_size": 18000,
+    "source_sample_size": 240,
+    "intended_synthetic_panel_size": 10,
+    "segment_variables": [
+      "region",
+      "disability status",
+      "tenure band"
+    ],
+    "expected_analyses": [
+      "Accessibility barrier topline",
+      "Workflow fit topline",
+      "Region cut",
+      "Tenure cut",
+      "Open-text friction themes"
+    ],
+    "unresolved_gaps": [
+      "No weighting plan was provided in the source brief.",
+      "The human sample recruitment criteria still need explicit accessibility-screening rules."
+    ],
+    "extraction_confidence_expectation": "n/a",
+    "professional_mode_blocked_without_gemini": false
+  },
+  "expected_study_plan": {
+    "study_type": "questionnaire_dry_run",
+    "objectives": [
+      "Validate accessibility-barrier wording before human fieldwork.",
+      "Check whether region and tenure cuts are reportable under minimum-base rules.",
+      "Confirm that open-text friction evidence is handled as coded themes rather than raw charts."
+    ],
+    "decision_questions": [
+      "Is the questionnaire ready for human fieldwork?",
+      "Which segment cuts should be suppressed or tabled?",
+      "Which accessibility barriers need wording changes?"
+    ],
+    "assumptions": [
+      "Synthetic responses are exploratory scenario evidence only.",
+      "The synthetic panel must remain separate from the 18,000-person target population."
+    ],
+    "question_roles": {
+      "q1": "primary_outcome",
+      "q2": "driver",
+      "q3": "diagnostic",
+      "q4": "diagnostic",
+      "q5": "qualitative_probe"
+    },
+    "chart_plan": [
+      "Render stable closed-ended toplines.",
+      "Use tables or suppression notes for unstable segment cuts.",
+      "Use evidence panels for open-text friction themes."
+    ]
+  },
+  "expected_question_rationales": [
+    {
+      "question_id": "q1",
+      "role": "primary_outcome",
+      "rationale": "Measures the headline accessibility workflow climate item."
+    },
+    {
+      "question_id": "q2",
+      "role": "driver",
+      "rationale": "Captures the main structured barrier behind accessibility friction."
+    },
+    {
+      "question_id": "q3",
+      "role": "diagnostic",
+      "rationale": "Checks whether disclosure and participation behavior signals additional questionnaire risk."
+    },
+    {
+      "question_id": "q4",
+      "role": "diagnostic",
+      "rationale": "Tests whether unstable segment cuts are handled honestly."
+    },
+    {
+      "question_id": "q5",
+      "role": "qualitative_probe",
+      "rationale": "Captures the most important unresolved accessibility or workflow issue in open text."
+    }
+  ],
+  "expected_synthetic_panel_limits": {
+    "target_population_size": 18000,
+    "source_sample_size": 240,
+    "intended_synthetic_panel_size": 10,
+    "require_separate_reporting": true
+  },
+  "expected_segmentation_behavior": {
+    "segment_variables": [
+      "region",
+      "disability status",
+      "tenure band"
+    ],
+    "minimum_base_rule": "Suppress slices below n=2.",
+    "suppression_rule": "Use tables or explicit suppression notes instead of unstable claims."
+  },
+  "expected_chart_decisions": [
+    {
+      "question_id": "q1",
+      "status": "rendered",
+      "reason_contains": "stable base"
+    },
+    {
+      "question_id": "q4",
+      "status": "replaced_with_table",
+      "reason_contains": "unstable segment cuts"
+    },
+    {
+      "question_id": "q5",
+      "status": "replaced_with_evidence_panel",
+      "reason_contains": "coded themes and quotes"
+    }
+  ],
+  "expected_report_warnings": [
+    "Synthetic scenario evidence only.",
+    "Do not treat 10 synthetic respondents as representative of the 18,000-person target population."
+  ],
+  "expected_human_fieldwork_handoff": [
+    "Resolve weighting and recruitment criteria before fieldwork.",
+    "Lock the accessibility-screening rules before any human launch."
+  ],
+  "instance_status": "authoring_complete"
+}

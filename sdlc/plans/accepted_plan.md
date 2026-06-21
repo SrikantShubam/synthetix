@@ -25,6 +25,8 @@ Synthetix is a self-hosted synthetic scenario-exploration and survey simulation 
 - `07-honest-predictor-improvement`: active; leakage-sensitive predictor work remains under review.
 - `08-rich-reporting-upgrade`: active; professional report depth criteria are stricter but rich generation is not complete.
 - `09-research-design-study-plan`: active and now executed through an intake-first vertical slice. `ResearchIntake` precedes `ResearchDesign` for document/questionnaire ingestion, professional PDF intake enforces explicit OCR confidence rules, and reports now disclose intake scale, chart decisions, and fieldwork handoff.
+- `10-golden-path-intake-reset`: active; golden-path proof artifacts now use real renderer paths and fixture-backed intake proof instead of placeholder proof outputs.
+- `11-report-chart-quality-recovery`: active; professional report quality now requires honest renderer evidence, hard-gate-capped scores, and explicit chart-type decisions instead of a bar-only fallback.
 
 ## Current Evaluation State
 
@@ -38,11 +40,13 @@ Synthetix is a self-hosted synthetic scenario-exploration and survey simulation 
 
 1. Replace remaining weak examples and benchmark-adjacent fixtures with golden-path intake fixtures that explicitly cover novice, professional, and bad-input document cases.
 2. Continue rich reporting only after the intake-first contract is used by the shipped examples and objective-coverage/report-depth outputs remain strong under those fixtures.
-3. Author and review locked holdout target JSON fixtures with source PDF hash validation.
-4. Run holdout actual-vs-predicted only after the target fixtures are locked.
-5. Keep all benchmark and report changes inside the scientific boundary.
-6. Harden the SDLC governor by running live Promptfoo gates once provider credentials are configured.
-7. Use Gryph evidence during future Codex/Claude Code sessions to generate dynamic context and review agent actions.
+3. Keep production or structured PDF proof honest and prevent fallback plaintext artifacts from passing as professional output.
+4. Expand chart selection beyond bar-only defaults and preserve evidence-panel suppression for qualitative questions.
+5. Author and review locked holdout target JSON fixtures with source PDF hash validation.
+6. Run holdout actual-vs-predicted only after the target fixtures are locked.
+7. Keep all benchmark and report changes inside the scientific boundary.
+8. Harden the SDLC governor by running live Promptfoo gates once provider credentials are configured.
+9. Use Gryph evidence during future Codex/Claude Code sessions to generate dynamic context and review agent actions.
 
 ## Non-Goals
 

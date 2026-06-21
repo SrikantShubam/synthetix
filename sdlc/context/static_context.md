@@ -87,6 +87,11 @@
       "id": "C017",
       "source": "docs/specs/09-research-design-study-plan.md, docs/protocols/research-design-standards-alignment.md",
       "text": "Professional report acceptance requires a complete explicit or confirmed ResearchDesign. Shallow reports, unmapped objectives, missing assumptions, missing target population definitions, missing analysis plans, missing qualitative coding plans, missing disclosure appendices, or broad benchmark accuracy claims cannot pass professional quality gates."
+    },
+    {
+      "id": "C018",
+      "source": "docs/specs/11-report-chart-quality-recovery.md",
+      "text": "Professional proof artifacts must use the real report renderer path and may not substitute plaintext fallback PDFs. Report quality scoring must cap failed hard-gate results below threshold, and backend chart generation must choose an explicit visual type or a suppression/evidence-panel path instead of defaulting every question to the same chart form."
     }
   ],
   "non_negotiable": [
@@ -102,7 +107,8 @@
     "C014",
     "C015",
     "C016",
-    "C017"
+    "C017",
+    "C018"
   ],
   "retired": []
 }
@@ -135,6 +141,8 @@ Synthetix is a self-hosted synthetic scenario-exploration and survey simulation 
 - `07-honest-predictor-improvement`: active; leakage-sensitive predictor work remains under review.
 - `08-rich-reporting-upgrade`: active; professional report depth criteria are stricter but rich generation is not complete.
 - `09-research-design-study-plan`: active and now executed through an intake-first vertical slice. `ResearchIntake` precedes `ResearchDesign` for document/questionnaire ingestion, professional PDF intake enforces explicit OCR confidence rules, and reports now disclose intake scale, chart decisions, and fieldwork handoff.
+- `10-golden-path-intake-reset`: active; golden-path proof artifacts now use real renderer paths and fixture-backed intake proof instead of placeholder proof outputs.
+- `11-report-chart-quality-recovery`: active; professional report quality now requires honest renderer evidence, hard-gate-capped scores, and explicit chart-type decisions instead of a bar-only fallback.
 
 ## Current Evaluation State
 
@@ -148,11 +156,13 @@ Synthetix is a self-hosted synthetic scenario-exploration and survey simulation 
 
 1. Replace remaining weak examples and benchmark-adjacent fixtures with golden-path intake fixtures that explicitly cover novice, professional, and bad-input document cases.
 2. Continue rich reporting only after the intake-first contract is used by the shipped examples and objective-coverage/report-depth outputs remain strong under those fixtures.
-3. Author and review locked holdout target JSON fixtures with source PDF hash validation.
-4. Run holdout actual-vs-predicted only after the target fixtures are locked.
-5. Keep all benchmark and report changes inside the scientific boundary.
-6. Harden the SDLC governor by running live Promptfoo gates once provider credentials are configured.
-7. Use Gryph evidence during future Codex/Claude Code sessions to generate dynamic context and review agent actions.
+3. Keep production or structured PDF proof honest and prevent fallback plaintext artifacts from passing as professional output.
+4. Expand chart selection beyond bar-only defaults and preserve evidence-panel suppression for qualitative questions.
+5. Author and review locked holdout target JSON fixtures with source PDF hash validation.
+6. Run holdout actual-vs-predicted only after the target fixtures are locked.
+7. Keep all benchmark and report changes inside the scientific boundary.
+8. Harden the SDLC governor by running live Promptfoo gates once provider credentials are configured.
+9. Use Gryph evidence during future Codex/Claude Code sessions to generate dynamic context and review agent actions.
 
 ## Non-Goals
 
@@ -255,6 +265,9 @@ task_routing:
   report_semantics:
     owner: "gpt-5.4"
     reason: "Report language must avoid representative survey claims."
+  report_visual_quality:
+    owner: "gpt-5.4"
+    reason: "Professional report acceptance and chart semantics affect external quality claims."
   orchestrator_policy:
     owner: "gpt-5.4"
     reason: "Agent model routing and forbidden paths are governance decisions."
@@ -282,6 +295,10 @@ task_routing:
     owner: "gpt-5.4-mini"
     reviewer: "gpt-5.4"
     reason: "Mini can implement inspectable UI views after copy/claims are constrained."
+  chart_rendering_plumbing:
+    owner: "gpt-5.4-mini"
+    reviewer: "gpt-5.4"
+    reason: "Mini can implement typed chart renderers after GPT-5.4 sets the semantic policy."
 
 workflow:
   planning:

@@ -80,6 +80,9 @@ task_routing:
   report_semantics:
     owner: "gpt-5.4"
     reason: "Report language must avoid representative survey claims."
+  report_visual_quality:
+    owner: "gpt-5.4"
+    reason: "Professional report acceptance and chart semantics affect external quality claims."
   orchestrator_policy:
     owner: "gpt-5.4"
     reason: "Agent model routing and forbidden paths are governance decisions."
@@ -107,6 +110,10 @@ task_routing:
     owner: "gpt-5.4-mini"
     reviewer: "gpt-5.4"
     reason: "Mini can implement inspectable UI views after copy/claims are constrained."
+  chart_rendering_plumbing:
+    owner: "gpt-5.4-mini"
+    reviewer: "gpt-5.4"
+    reason: "Mini can implement typed chart renderers after GPT-5.4 sets the semantic policy."
 
 workflow:
   planning:

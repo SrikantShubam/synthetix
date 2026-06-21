@@ -2,6 +2,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from reportlab.lib.pagesizes import A4
+from reportlab.pdfgen import canvas
+
 from synthetix.reporting.quality import (
     REQUIRED_REPORT_SECTIONS,
     ArtifactChecksum,
@@ -107,6 +110,18 @@ def valid_quality_input() -> ReportQualityInput:
         benchmark_wording_texts=[
             "Benchmark comparisons use selected metric pass rate wording only."
         ],
+        report_warnings=[
+            "Synthetic scenario evidence only.",
+            "Do not infer prevalence, causality, or statistical significance from this report.",
+        ],
+        chart_decisions=[
+            {
+                "question_id": "q1",
+                "status": "rendered",
+                "reason": "Closed-ended distribution has a stable base and chart-safe categorical labels.",
+            }
+        ],
+        pdf_rendering_mode="weasyprint",
     )
 
 
@@ -114,6 +129,7 @@ def test_weighted_quality_score_is_deterministic_and_thresholded() -> None:
     result = ReportQualityScorer().evaluate(valid_quality_input())
 
     assert result.total_score == 90.0
+    assert result.raw_total_score == 90.0
     assert result.passes_threshold is True
     assert result.accepted is True
     assert result.failed_hard_gates == []
@@ -155,7 +171,11 @@ def test_hard_gates_override_high_score() -> None:
                 )
             ],
             "non_inferential_warning_present": False,
+            "report_warnings": [],
             "claim_texts": ["This difference is statistically significant."],
+            "chart_decisions": [],
+            "rendered_text_artifacts": ["pdf_contains_visible_html_entities"],
+            "pdf_rendering_mode": "fallback_plaintext",
             "attrition": AttritionEvidence(
                 labels=["succeeded"],
                 counts={"succeeded": 10, "failed": 1, "refused": 1},
@@ -195,7 +215,8 @@ def test_hard_gates_override_high_score() -> None:
 
     result = ReportQualityScorer().evaluate(broken)
 
-    assert result.total_score == 100.0
+    assert result.raw_total_score == 100.0
+    assert result.total_score == 0.0
     assert result.passes_threshold is False
     assert result.accepted is False
     assert set(result.failed_hard_gates) == {
@@ -208,6 +229,7 @@ def test_hard_gates_override_high_score() -> None:
         "artifact_checksums_validate",
         "non_inferential_warning_exists",
         "no_inferential_claims",
+        "rendered_text_has_no_html_artifacts",
         "attrition_represents_failed_and_refused",
         "professional_report_depth",
         "professional_research_design_required",
@@ -256,10 +278,20 @@ def test_build_quality_input_derives_real_gate_inputs(tmp_path: Path) -> None:
     checksums_path = tmp_path / "checksums.json"
     json_path.write_text("{}", encoding="utf-8")
     html_path.write_text(
-        "<html><body>Non-inferential synthetic evidence only.</body></html>",
+        "<html><body><section><h2>Report warnings and chart decisions</h2><h3>Report warnings</h3><p>Synthetic scenario evidence only.</p><p>Do not infer prevalence, causality, or statistical significance from this report.</p><h3>Chart decision log</h3><p>q1: rendered. Closed-ended distribution has a stable base and chart-safe categorical labels.</p></section></body></html>",
         encoding="utf-8",
     )
-    pdf_path.write_bytes(b"%PDF-1.4\n")
+    pdf = canvas.Canvas(str(pdf_path), pagesize=A4, pageCompression=1, invariant=1)
+    pdf.drawString(48, A4[1] - 48, "Report warnings and chart decisions")
+    pdf.drawString(48, A4[1] - 56, "Chart decision log")
+    pdf.drawString(48, A4[1] - 64, "Synthetic scenario evidence only.")
+    pdf.drawString(
+        48,
+        A4[1] - 80,
+        "Do not infer prevalence, causality, or statistical significance from this report.",
+    )
+    pdf.drawString(48, A4[1] - 96, "q1: rendered. Closed-ended distribution has a stable base and chart-safe categorical labels.")
+    pdf.save()
     checksums_path.write_text(
         '{"report.json":"44136fa355b3678a1146ad16f7e8649e94fb4fc21f e77e8310c060f61caaff8a"}'.replace(" ", ""),
         encoding="utf-8",
@@ -275,6 +307,10 @@ def test_build_quality_input_derives_real_gate_inputs(tmp_path: Path) -> None:
     quality_input = build_quality_input(report, artifacts)
 
     assert quality_input.non_inferential_warning_present is True
+    assert quality_input.report_warnings
+    assert quality_input.chart_decisions
+    assert quality_input.rendered_text_artifacts == []
+    assert quality_input.pdf_rendering_mode == "weasyprint"
     assert set(REQUIRED_REPORT_SECTIONS).issubset(set(quality_input.sections_present))
     assert "research_design" in quality_input.sections_present
     assert "objective_coverage" in quality_input.sections_present
@@ -282,6 +318,8 @@ def test_build_quality_input_derives_real_gate_inputs(tmp_path: Path) -> None:
     assert quality_input.configured_population_dimensions == ["region"]
     assert quality_input.artifact_checksums[0].path == "report.json"
     assert quality_input.research_design_tier == "professional"
+    assert quality_input.report_warnings
+    assert quality_input.chart_decisions
 
 
 def test_build_quality_input_sanitizes_narrative_chart_labels(tmp_path: Path) -> None:
@@ -368,6 +406,68 @@ def test_build_quality_input_flags_prose_labels_for_typed_questions(tmp_path: Pa
 
     assert input_model.typed_answer_issues
     assert "typed_answer_integrity" in score.failed_hard_gates
+
+
+def test_build_quality_input_flags_escaped_html_entities_in_rendered_text(tmp_path: Path) -> None:
+    report = ReportModel.example()
+    (tmp_path / "report.json").write_text("{}", encoding="utf-8")
+    (tmp_path / "report.html").write_text(
+        "<html><body>Report warnings and chart decisions.<p>Bad entity: &amp;amp;</p></body></html>",
+        encoding="utf-8",
+    )
+    pdf_path = tmp_path / "report.pdf"
+    pdf = canvas.Canvas(str(pdf_path), pagesize=A4, pageCompression=1, invariant=1)
+    pdf.drawString(48, A4[1] - 48, "Report warnings and chart decisions.")
+    pdf.drawString(48, A4[1] - 64, "Bad entity: &amp;")
+    pdf.save()
+    (tmp_path / "checksums.json").write_text(
+        '{"report.json":"44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a","report.html":"","report.pdf":""}',
+        encoding="utf-8",
+    )
+    artifacts = ReportArtifacts(
+        json_path=tmp_path / "report.json",
+        html_path=tmp_path / "report.html",
+        pdf_path=tmp_path / "report.pdf",
+        checksums_path=tmp_path / "checksums.json",
+        chart_paths=[],
+    )
+
+    quality_input = build_quality_input(report, artifacts)
+    score = ReportQualityScorer().evaluate(quality_input)
+
+    assert "html_contains_visible_html_entities" in quality_input.rendered_text_artifacts
+    assert "pdf_contains_visible_html_entities" in quality_input.rendered_text_artifacts
+    assert "rendered_text_has_no_html_artifacts" in score.failed_hard_gates
+
+
+def test_rendered_html_entity_artifacts_fail_quality_gate() -> None:
+    broken = valid_quality_input().model_copy(
+        update={"rendered_text_artifacts": ["pdf_contains_visible_html_entities"]}
+    )
+
+    result = ReportQualityScorer().evaluate(broken)
+
+    assert result.accepted is False
+    assert "rendered_text_has_no_html_artifacts" in result.failed_hard_gates
+
+
+def test_professional_fallback_pdf_mode_fails_quality_gate() -> None:
+    broken = valid_quality_input().model_copy(update={"pdf_rendering_mode": "fallback_plaintext"})
+
+    result = ReportQualityScorer().evaluate(broken)
+
+    assert result.accepted is False
+    assert result.total_score == 74.0
+    assert "professional_pdf_uses_production_renderer" in result.failed_hard_gates
+
+
+def test_professional_structured_reportlab_mode_passes_pdf_gate() -> None:
+    quality_input = valid_quality_input().model_copy(update={"pdf_rendering_mode": "reportlab_structured"})
+
+    result = ReportQualityScorer().evaluate(quality_input)
+
+    assert result.accepted is True
+    assert "professional_pdf_uses_production_renderer" not in result.failed_hard_gates
 
 
 def test_build_quality_input_counts_segment_level_qualitative_themes(tmp_path: Path) -> None:

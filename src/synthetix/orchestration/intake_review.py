@@ -409,7 +409,7 @@ def _review_report_artifacts(
         findings.append(
             ReviewFinding(
                 category="report_generation",
-                severity="warning",
+                severity="error",
                 code="professional_report_quality_failed",
                 artifact_paths=[str(quality_path)],
                 message="Golden-path proof report failed the professional quality scorer.",

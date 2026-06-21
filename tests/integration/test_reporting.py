@@ -104,6 +104,7 @@ def _rich_report() -> ReportModel:
                     ),
                 ],
                 chart_decision=ChartDecision(
+                    question_id="q1",
                     status="rendered",
                     reason="Choice distribution has a stable base and categorical labels.",
                 ),
@@ -133,10 +134,27 @@ def _rich_report() -> ReportModel:
                     )
                 ],
                 chart_decision=ChartDecision(
+                    question_id="q2",
                     status="replaced_with_evidence_panel",
                     reason="Open-text evidence is better shown through coded themes and quotes than a raw chart.",
                 ),
             ),
+        ],
+        chart_decisions=[
+            ChartDecision(
+                question_id="q1",
+                status="rendered",
+                reason="Choice distribution has a stable base and categorical labels.",
+            ),
+            ChartDecision(
+                question_id="q2",
+                status="replaced_with_evidence_panel",
+                reason="Open-text evidence is better shown through coded themes and quotes than a raw chart.",
+            ),
+        ],
+        warnings=[
+            "Synthetic scenario evidence only.",
+            "Do not infer prevalence, causality, or statistical significance from this report.",
         ],
         executive_findings=[
             ExecutiveFinding(
@@ -348,6 +366,7 @@ def test_report_pipeline_renders_executive_and_appendix_sections(
     assert "Population composition" in html
     assert "Research design" in html
     assert "Research intake" in html
+    assert "Report warnings and chart decisions" in html
     assert "Question distributions" in html
     assert "Question interpretation and implications" in html
     assert "Segment comparisons" in html
@@ -378,6 +397,7 @@ def test_report_pipeline_renders_executive_and_appendix_sections(
     assert "Technical appendix" in text
     assert "Non-inferential use warning" in text
     assert "Question interpretation and implications" in text
+    assert "Report warnings and chart decisions" in text
     assert "Quote evidence appendix" in text
     assert "Fieldwork handoff" in text
 
@@ -442,7 +462,7 @@ def test_report_pipeline_uses_theme_tables_not_raw_open_text_charts(
     artifacts = render_report(report, tmp_path)
     html = artifacts.html_path.read_text(encoding="utf-8")
 
-    assert len(artifacts.chart_paths) == 1
+    assert len(artifacts.chart_paths) == 0
     assert "Suspicion about shifting responsibility" in html
     assert "Skepticism about impact credibility" in html
     assert "I feel suspicious because it shifts responsibility to consumers." in html
@@ -541,7 +561,7 @@ def test_renderer_uses_compact_chart_title() -> None:
     assert renderer._chart_title(question) == "Response distribution"
 
 
-def test_report_pipeline_fails_explicitly_without_weasyprint(
+def test_report_pipeline_uses_structured_pdf_fallback_without_weasyprint(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     monkeypatch.setattr(
@@ -554,9 +574,9 @@ def test_report_pipeline_fails_explicitly_without_weasyprint(
         ),
     )
 
-    with pytest.raises(RuntimeError, match="WeasyPrint is required to render report PDFs"):
-        render_report(ReportModel.example(), tmp_path)
+    artifacts = render_report(ReportModel.example(), tmp_path)
 
     assert (tmp_path / "report.json").exists()
     assert (tmp_path / "report.html").exists()
-    assert not (tmp_path / "report.pdf").exists()
+    assert (tmp_path / "report.pdf").exists()
+    assert artifacts.render_mode == "reportlab_structured"

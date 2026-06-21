@@ -1,0 +1,94 @@
+{
+  "fixture_id": "val_golden_path_novice_segmentation_warning_v1",
+  "data_partition": "validation",
+  "evaluation_only": true,
+  "training_allowed": false,
+  "fixture_class": "novice_concept_test",
+  "source_material": {
+    "format": "markdown_brief",
+    "title": "Novice pricing concept with segment temptation",
+    "body": "A novice user wants a dry run for a pricing concept survey and keeps asking for segment charts even though no segment plan exists. The target audience is early-career professionals. Use a small synthetic panel, provide plain-language warnings, and avoid unsupported subgroup claims."
+  },
+  "expected_research_intake": {
+    "mode": "novice",
+    "source_type": "markdown_brief",
+    "research_context": "Plain-language novice pricing-concept dry run with unsupported segmentation requests.",
+    "target_population_summary": "Early-career professionals considering a new pricing offer.",
+    "target_population_size": 3500,
+    "source_sample_size": null,
+    "intended_synthetic_panel_size": 6,
+    "segment_variables": [],
+    "expected_analyses": [
+      "Topline reaction readout",
+      "Unsupported segmentation warning"
+    ],
+    "unresolved_gaps": [
+      "The novice user requested segments without declaring a real segment plan."
+    ],
+    "extraction_confidence_expectation": "n/a",
+    "professional_mode_blocked_without_gemini": false
+  },
+  "expected_study_plan": {
+    "study_type": "concept_test",
+    "objectives": [
+      "Preview likely reactions to the pricing concept.",
+      "Warn against unsupported subgroup reporting before fieldwork."
+    ],
+    "decision_questions": [
+      "Should the pricing concept move to human fieldwork?"
+    ],
+    "assumptions": [
+      "Synthetic responses are exploratory only."
+    ],
+    "question_roles": {
+      "q1": "primary_outcome",
+      "q5": "qualitative_probe"
+    },
+    "chart_plan": [
+      "Render a single closed-ended topline chart.",
+      "Use warnings instead of subgroup charts."
+    ]
+  },
+  "expected_question_rationales": [
+    {
+      "question_id": "q1",
+      "role": "primary_outcome",
+      "rationale": "Measures topline willingness to proceed."
+    },
+    {
+      "question_id": "q5",
+      "role": "qualitative_probe",
+      "rationale": "Captures the main open-text concern in plain language."
+    }
+  ],
+  "expected_synthetic_panel_limits": {
+    "target_population_size": 3500,
+    "intended_synthetic_panel_size": 6,
+    "require_separate_reporting": true
+  },
+  "expected_segmentation_behavior": {
+    "segment_variables": [],
+    "minimum_base_rule": "No subgroup reporting without declared segments."
+  },
+  "expected_chart_decisions": [
+    {
+      "question_id": "q1",
+      "status": "rendered",
+      "reason_contains": "stable base"
+    },
+    {
+      "question_id": "q5",
+      "status": "replaced_with_evidence_panel",
+      "reason_contains": "coded themes and quotes"
+    }
+  ],
+  "expected_report_warnings": [
+    "Synthetic scenario evidence only.",
+    "Do not create subgroup charts when no segment plan exists."
+  ],
+  "expected_human_fieldwork_handoff": [
+    "Define a real segment plan before asking for subgroup reporting.",
+    "Use the dry run to improve wording before human fieldwork."
+  ],
+  "instance_status": "authoring_complete"
+}

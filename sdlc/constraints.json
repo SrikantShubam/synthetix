@@ -84,6 +84,11 @@
       "id": "C017",
       "source": "docs/specs/09-research-design-study-plan.md, docs/protocols/research-design-standards-alignment.md",
       "text": "Professional report acceptance requires a complete explicit or confirmed ResearchDesign. Shallow reports, unmapped objectives, missing assumptions, missing target population definitions, missing analysis plans, missing qualitative coding plans, missing disclosure appendices, or broad benchmark accuracy claims cannot pass professional quality gates."
+    },
+    {
+      "id": "C018",
+      "source": "docs/specs/11-report-chart-quality-recovery.md",
+      "text": "Professional proof artifacts must use the real report renderer path and may not substitute plaintext fallback PDFs. Report quality scoring must cap failed hard-gate results below threshold, and backend chart generation must choose an explicit visual type or a suppression/evidence-panel path instead of defaulting every question to the same chart form."
     }
   ],
   "non_negotiable": [
@@ -99,7 +104,8 @@
     "C014",
     "C015",
     "C016",
-    "C017"
+    "C017",
+    "C018"
   ],
   "retired": []
 }

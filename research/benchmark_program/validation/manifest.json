@@ -26,6 +26,14 @@
     {
       "fixture_id": "val_golden_path_bad_input_scanned_v1",
       "path": "research/benchmark_program/validation/golden_path_bad_input_scanned_v1.json"
+    },
+    {
+      "fixture_id": "val_golden_path_professional_manual_intake_v1",
+      "path": "research/benchmark_program/validation/golden_path_professional_manual_intake_v1.json"
+    },
+    {
+      "fixture_id": "val_golden_path_novice_segmentation_warning_v1",
+      "path": "research/benchmark_program/validation/golden_path_novice_segmentation_warning_v1.json"
     }
   ]
 }

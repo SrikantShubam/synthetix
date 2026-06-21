@@ -197,6 +197,61 @@ def _echarts_bar_option(
     }
 
 
+def _echarts_donut_option(
+    *,
+    title: str,
+    labels: list[str],
+    values: list[int],
+) -> dict[str, Any]:
+    return {
+        "animation": False,
+        "title": {"text": title, "left": "left"},
+        "tooltip": {"trigger": "item"},
+        "legend": {"bottom": 0, "left": "center"},
+        "series": [
+            {
+                "type": "pie",
+                "radius": ["42%", "68%"],
+                "avoidLabelOverlap": True,
+                "label": {"show": True, "formatter": "{b}: {c}"},
+                "data": [
+                    {"name": label, "value": value}
+                    for label, value in zip(labels, values, strict=False)
+                ],
+            }
+        ],
+    }
+
+
+def _echarts_likert_option(
+    *,
+    title: str,
+    labels: list[str],
+    values: list[int],
+) -> dict[str, Any]:
+    palette = ["#9ecae1", "#6baed6", "#4292c6", "#2171b5", "#084594", "#08306b"]
+    return {
+        "animation": False,
+        "title": {"text": title, "left": "left"},
+        "tooltip": {"trigger": "item"},
+        "grid": {"left": 56, "right": 24, "top": 56, "bottom": 72, "containLabel": True},
+        "xAxis": {"type": "value", "minInterval": 1},
+        "yAxis": {"type": "category", "data": ["Synthetic responses"]},
+        "legend": {"bottom": 0, "left": "center"},
+        "series": [
+            {
+                "name": label,
+                "type": "bar",
+                "stack": "total",
+                "label": {"show": value > 0, "formatter": str(value)},
+                "itemStyle": {"color": palette[index % len(palette)]},
+                "data": [value],
+            }
+            for index, (label, value) in enumerate(zip(labels, values, strict=False))
+        ],
+    }
+
+
 def _clean_open_text(value: Any) -> str | None:
     if value is None:
         return None
@@ -505,15 +560,21 @@ def _build_population_charts(segment_composition: list[SegmentComposition]) -> l
                 chart_id=f"population:{composition.attribute}",
                 title=title,
                 chart_family="population_segment",
+                visual_type="donut" if 2 <= len(values) <= 5 and sum(values) > 0 else "horizontal_bar",
                 labels=labels,
                 values=values,
                 full_labels=full_labels,
                 denominator=sum(values),
-                option=_echarts_bar_option(
-                    title=title,
-                    labels=labels,
-                    values=values,
-                    y_axis_label="Synthetic respondents",
+                option=(
+                    _echarts_donut_option(title=title, labels=full_labels, values=values)
+                    if 2 <= len(values) <= 5 and sum(values) > 0
+                    else _echarts_bar_option(
+                        title=title,
+                        labels=labels,
+                        values=values,
+                        y_axis_label="Synthetic respondents",
+                        horizontal=True,
+                    )
                 ),
             )
         )
@@ -521,64 +582,83 @@ def _build_population_charts(segment_composition: list[SegmentComposition]) -> l
 
 
 def _build_question_chart(report: QuestionReport) -> AnalyticsChart | None:
-    if report.question_type in {"choice", "likert"} and report.distribution.labels:
+    if report.question_type == "likert" and report.distribution.labels:
         labels = [_wrap_chart_label(label) for label in report.distribution.labels]
         values = list(report.distribution.values)
         return AnalyticsChart(
             chart_id=f"question:{report.question_id}",
             title=report.prompt,
             chart_family="question_distribution",
+            visual_type="likert_stacked",
             labels=labels,
             values=values,
             full_labels=list(report.distribution.labels),
             denominator=report.denominators.valid_responses,
-            option=_echarts_bar_option(
+            option=_echarts_likert_option(
+                title=report.prompt,
+                labels=list(report.distribution.labels),
+                values=values,
+            ),
+        )
+    if report.question_type == "choice" and report.distribution.labels:
+        labels = [_wrap_chart_label(label) for label in report.distribution.labels]
+        values = list(report.distribution.values)
+        full_labels = list(report.distribution.labels)
+        use_donut = 2 <= len(values) <= 3 and sum(values) > 0
+        use_horizontal = not use_donut and any(len(label) > 18 for label in full_labels)
+        visual_type = "donut" if use_donut else "horizontal_bar" if use_horizontal else "bar"
+        option: dict[str, Any]
+        if use_donut:
+            option = _echarts_donut_option(
+                title=report.prompt,
+                labels=full_labels,
+                values=values,
+            )
+        else:
+            option = _echarts_bar_option(
                 title=report.prompt,
                 labels=labels,
                 values=values,
                 y_axis_label="Synthetic responses",
-            ),
-        )
-    if report.question_type == "open_text" and report.themes:
-        labels = [_theme_axis_label(theme.label, index) for index, theme in enumerate(report.themes, start=1)]
-        values = [theme.count for theme in report.themes]
-        full_labels = [theme.label for theme in report.themes]
+                horizontal=use_horizontal,
+            )
         return AnalyticsChart(
             chart_id=f"question:{report.question_id}",
-            title=f"{report.question_id} themes",
-            chart_family="question_themes",
+            title=report.prompt,
+            chart_family="question_distribution",
+            visual_type=visual_type,
             labels=labels,
             values=values,
             full_labels=full_labels,
             denominator=report.denominators.valid_responses,
-            option=_echarts_bar_option(
-                title=f"{report.question_id} themes",
-                labels=labels,
-                values=values,
-                y_axis_label="Theme mentions",
-                horizontal=True,
-            ),
+            option=option,
         )
+    if report.question_type == "open_text" and report.themes:
+        return None
     return None
 
 
 def _chart_decision(report: QuestionReport) -> ChartDecision:
     if report.denominators.valid_responses < MIN_SEGMENT_BASE:
         return ChartDecision(
+            question_id=report.question_id,
             status="suppressed",
             reason="Question base is too small for a stable chart.",
         )
     if report.question_type in {"choice", "likert"} and report.distribution.labels:
         return ChartDecision(
+            question_id=report.question_id,
             status="rendered",
             reason="Closed-ended distribution has a stable base and chart-safe categorical labels.",
         )
     if report.question_type == "open_text" and report.themes:
         return ChartDecision(
+            question_id=report.question_id,
             status="replaced_with_evidence_panel",
             reason="Open-text evidence is better shown through coded themes and quotes than a raw chart.",
         )
     return ChartDecision(
+        question_id=report.question_id,
         status="replaced_with_table",
         reason="No chart-safe series was available for this question.",
     )
@@ -612,6 +692,7 @@ def _build_question_report(
             quote_evidence=quote_evidence,
             segment_cuts=_build_segment_cuts(question, succeeded_respondents, population_attributes),
             chart_decision=ChartDecision(
+                question_id=question.id,
                 status="rendered",
                 reason="Closed-ended distribution has a stable base and chart-safe categorical labels.",
             ),
@@ -636,6 +717,7 @@ def _build_question_report(
             quote_evidence=quote_evidence,
             segment_cuts=_build_segment_cuts(question, succeeded_respondents, population_attributes),
             chart_decision=ChartDecision(
+                question_id=question.id,
                 status="rendered",
                 reason="Closed-ended distribution has a stable base and chart-safe categorical labels.",
             ),
@@ -660,6 +742,7 @@ def _build_question_report(
         themes=themes,
         segment_cuts=_build_segment_cuts(question, succeeded_respondents, population_attributes),
         chart_decision=ChartDecision(
+            question_id=question.id,
             status="replaced_with_evidence_panel" if themes else "replaced_with_table",
             reason=(
                 "Open-text evidence is better shown through coded themes and quotes than a raw chart."
@@ -852,6 +935,12 @@ def build_report(
             for attempt in respondent.attempts
         ),
         cost_usd=result.total_cost_usd,
+        chart_decisions=[
+            report.chart_decision
+            for report in question_reports
+            if report.chart_decision is not None
+        ],
+        warnings=_build_report_warnings(blueprint),
         limitations=[
             "Synthetic personas are not sampled human respondents.",
             "Do not infer population prevalence, causality, or statistical significance.",
@@ -860,6 +949,23 @@ def build_report(
         ],
         manifest=manifest.model_dump(mode="json"),
     )
+
+
+def _build_report_warnings(blueprint: SimulationBlueprint) -> list[str]:
+    warnings: list[str] = []
+    research_design = blueprint.research_design
+    if research_design is None:
+        warnings.append("Synthetic scenario evidence only.")
+        return warnings
+
+    if research_design.disclosure_plan.synthetic_only_warning:
+        warnings.append("Synthetic scenario evidence only.")
+    if research_design.disclosure_plan.non_inferential_limits:
+        warnings.append(
+            "Do not infer prevalence, causality, or statistical significance from this report."
+        )
+    warnings.extend(research_design.disclosure_plan.data_quality_notes)
+    return list(dict.fromkeys(warnings))
 
 
 def _build_fieldwork_handoff(blueprint: SimulationBlueprint) -> list[str]:

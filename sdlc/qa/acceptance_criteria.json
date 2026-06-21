@@ -104,6 +104,21 @@
       "id": "A021",
       "source": "docs/specs/09-research-design-study-plan.md, docs/specs/06-agent-orchestrator-loop.md",
       "text": "The orchestrator rejects substandard study plans and report outputs, records rejection notes, and loops until research-design, report-quality, policy, unit, and integration gates pass or a hard blocker is recorded."
+    },
+    {
+      "id": "A022",
+      "source": "docs/specs/11-report-chart-quality-recovery.md",
+      "text": "Golden-path professional proof uses the real report renderer path and never passes with fallback plaintext PDF artifacts."
+    },
+    {
+      "id": "A023",
+      "source": "docs/specs/11-report-chart-quality-recovery.md",
+      "text": "Report quality artifacts expose both raw_total_score and gated total_score, and any failed hard gate caps total_score below the passing threshold."
+    },
+    {
+      "id": "A024",
+      "source": "docs/specs/11-report-chart-quality-recovery.md",
+      "text": "Backend chart generation chooses explicit visual types or suppression paths by question semantics; open-text questions use evidence panels or tables instead of raw charts."
     }
   ]
 }

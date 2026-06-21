@@ -255,6 +255,7 @@ class OrchestratorLoop:
             "08-rich-reporting-upgrade",
             "09-research-design-study-plan",
             "10-golden-path-intake-reset",
+            "11-report-chart-quality-recovery",
         }
         if task.spec_id in high_judgment_specs and task.assigned_model != AgentModel.GPT_5_4:
             raise ValueError(f"Spec '{task.spec_id}' must be assigned to GPT-5.4")
@@ -518,6 +519,29 @@ class OrchestratorLoop:
                     "fixture_design",
                     "proof_generation",
                     "review",
+                    "unit_tests",
+                    "integration_tests",
+                    "policy_gates",
+                ],
+            ),
+            "11-report-chart-quality-recovery": OrchestratorTask(
+                spec_id="11-report-chart-quality-recovery",
+                task_id="11-report-chart-quality-recovery",
+                title="Report and chart quality recovery",
+                assigned_model=AgentModel.GPT_5_4,
+                allowed_paths=[
+                    "src/synthetix/reporting",
+                    "src/synthetix/analysis",
+                    "src/synthetix/benchmarking",
+                    "src/synthetix/orchestration",
+                    "tests",
+                    "docs/specs/11-report-chart-quality-recovery.md",
+                    "data/golden-path",
+                ],
+                forbidden_paths=["research/source_of_truth", "data/benchmark-results/holdout"],
+                acceptance_checks=[
+                    "report_quality",
+                    "report_artifacts",
                     "unit_tests",
                     "integration_tests",
                     "policy_gates",

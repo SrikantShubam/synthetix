@@ -30,7 +30,7 @@
     "assumptions": ["Synthetic responses are exploratory only."],
     "question_roles": {
       "q1": "primary_outcome",
-      "q2": "qualitative_probe"
+      "q5": "qualitative_probe"
     },
     "chart_plan": ["Render a topline closed-ended chart.", "Suppress open-text raw charts and use evidence instead."]
   },
@@ -41,7 +41,7 @@
       "rationale": "Measures topline concept appeal in a simple way for a novice user."
     },
     {
-      "question_id": "q2",
+      "question_id": "q5",
       "role": "qualitative_probe",
       "rationale": "Captures the main reason behind the reaction in the respondent's own words."
     }
@@ -62,7 +62,7 @@
       "reason_contains": "stable base"
     },
     {
-      "question_id": "q2",
+      "question_id": "q5",
       "status": "replaced_with_evidence_panel",
       "reason_contains": "coded themes and quotes"
     }

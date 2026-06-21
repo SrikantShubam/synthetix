@@ -28,6 +28,7 @@ REQUIRED_SPEC_IDS = [
     "08-rich-reporting-upgrade",
     "09-research-design-study-plan",
     "10-golden-path-intake-reset",
+    "11-report-chart-quality-recovery",
 ]
 
 
@@ -166,6 +167,35 @@ def test_orchestrator_exposes_contract_fixture_proof_review_task(tmp_path: Path)
     ]
 
 
+def test_orchestrator_exposes_report_chart_recovery_task_after_golden_path_reset(tmp_path: Path) -> None:
+    state_path = tmp_path / "state.json"
+    state_path.write_text(
+        json.dumps(
+            {
+                "completed_specs": REQUIRED_SPEC_IDS[:11],
+                "active_task_id": None,
+                "rejected_attempts": [],
+                "accepted_artifacts": [],
+                "last_verification": None,
+            }
+        ),
+        encoding="utf-8",
+    )
+    loop = OrchestratorLoop.for_workspace(Path.cwd(), state_path=state_path)
+
+    task = loop.next_task()
+
+    assert task.spec_id == "11-report-chart-quality-recovery"
+    assert task.assigned_model == AgentModel.GPT_5_4
+    assert task.acceptance_checks == [
+        "report_quality",
+        "report_artifacts",
+        "unit_tests",
+        "integration_tests",
+        "policy_gates",
+    ]
+
+
 def test_orchestrator_rejects_example_golden_path_report_stub(tmp_path: Path) -> None:
     generate_golden_path_proof(Path.cwd(), output_dir=tmp_path / "golden-path")
     report_json = tmp_path / "golden-path" / "report-proof" / "report.json"
@@ -206,6 +236,27 @@ def test_golden_path_review_rejects_sparse_contract_evidence(tmp_path: Path) -> 
 
     assert review.passed is False
     assert any(finding.code == "contract_sparse_evidence" for finding in review.findings)
+
+
+def test_golden_path_review_passes_with_expanded_fixture_set(tmp_path: Path) -> None:
+    generate_golden_path_proof(Path.cwd(), output_dir=tmp_path / "golden-path")
+
+    review = review_golden_path_workspace(
+        Path.cwd(),
+        proof_path=tmp_path / "golden-path" / "intake-proof" / "proof-summary.json",
+        output_path=tmp_path / "golden-path" / "review-latest.json",
+    )
+
+    assert review.passed is True
+    assert review.summary["fixture_design"].errors == 0
+    assert review.summary["contract_extraction"].errors == 0
+    assert set(review.reviewed_fixture_ids) == {
+        "val_golden_path_bad_input_scanned_v1",
+        "val_golden_path_novice_concept_v1",
+        "val_golden_path_novice_segmentation_warning_v1",
+        "val_golden_path_professional_dry_run_v1",
+        "val_golden_path_professional_manual_intake_v1",
+    }
 
 
 def test_orchestrator_rejects_holdout_paths_except_holdout_readiness() -> None:

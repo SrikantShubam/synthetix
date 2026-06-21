@@ -58,6 +58,7 @@ def make_score(
     ]
     return ReportQualityScore(
         total_score=total_score,
+        raw_total_score=total_score,
         threshold=85.0,
         passes_threshold=total_score >= 85.0,
         accepted=not hard_gate_failures and total_score >= 85.0,

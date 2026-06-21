@@ -123,7 +123,7 @@
     "question_roles": {
       "q1": "primary_outcome",
       "q2": "driver",
-      "q3": "qualitative_probe",
+      "q3": "diagnostic",
       "q4": "diagnostic",
       "q5": "qualitative_probe"
     },
@@ -146,8 +146,8 @@
     },
     {
       "question_id": "q3",
-      "role": "qualitative_probe",
-      "rationale": "Captures the reasons respondents avoid speaking up or disclosing identity, mirroring the report's avoidance and harassment themes."
+      "role": "diagnostic",
+      "rationale": "Captures the structured avoidance/disclosure pattern that signals climate risk before the open-text follow-up."
     },
     {
       "question_id": "q4",

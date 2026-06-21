@@ -34,13 +34,6 @@ from synthetix.ingestion.documents import DocumentLimits, extract_document
 from synthetix.ingestion.intake import ensure_professional_document_intake_allowed
 from synthetix.reporting.quality import ReportQualityScorer, build_quality_input
 from synthetix.reporting.renderer import (
-    ReportArtifacts,
-    _build_report_view,
-    _checksum,
-    _json_default,
-    _render_charts,
-    _render_html,
-    _report_payload,
     render_report,
 )
 
@@ -229,6 +222,13 @@ def validate_golden_path_fixture_set(fixtures: list[GoldenPathFixture]) -> list[
             findings.append(
                 f"{fixture.fixture_id}: expected_study_plan.question_roles contains unsupported values"
             )
+        invalid_role_assignments = _invalid_role_assignments(
+            fixture.expected_study_plan.question_roles
+        )
+        if invalid_role_assignments:
+            findings.append(
+                f"{fixture.fixture_id}: invalid role-to-question assignments: {', '.join(invalid_role_assignments)}"
+            )
     return findings
 
 
@@ -326,7 +326,13 @@ def generate_golden_path_proof(
                 comparison_path=comparison_path,
             )
         )
-        if fixture.fixture_class == "professional_survey_dry_run":
+        if fixture.fixture_class == "professional_survey_dry_run" and (
+            professional_fixture is None
+            or (
+                professional_fixture.test_case_source_document is None
+                and fixture.test_case_source_document is not None
+            )
+        ):
             professional_fixture = fixture
 
     if professional_fixture is None:
@@ -402,14 +408,15 @@ def _write_report_proof(
     report_dir.mkdir(parents=True, exist_ok=True)
     blueprint = _build_blueprint_from_fixture(fixture)
     result = _build_run_result_from_fixture(fixture)
+    source_hashes = (
+        {fixture.test_case_source_document.path: "golden-path-proof"}
+        if fixture.test_case_source_document is not None
+        else {f"{fixture.fixture_id}.md": "golden-path-brief"}
+    )
     manifest = RunManifest.create(
         run_id="golden-path-proof",
         blueprint=blueprint,
-        source_hashes={
-            fixture.test_case_source_document.path: "golden-path-proof"
-            if fixture.test_case_source_document is not None
-            else "golden-path-brief"
-        },
+        source_hashes=source_hashes,
         model_id="synthetix/deterministic-proof",
         provider="synthetix",
         parameters={"mode": "golden-path-proof"},
@@ -429,12 +436,7 @@ def _write_report_proof(
             "fieldwork_handoff": fixture.expected_human_fieldwork_handoff,
         }
     )
-    try:
-        artifacts = render_report(report, report_dir)
-    except RuntimeError:
-        artifacts = _write_fallback_report_artifacts(report, report_dir)
-    if not hasattr(artifacts, "json_path"):
-        artifacts = _write_fallback_report_artifacts(report, report_dir)
+    artifacts = render_report(report, report_dir)
     quality_input = build_quality_input(report, artifacts)
     quality = ReportQualityScorer().evaluate(quality_input)
     quality_path = report_dir / "report_quality.json"
@@ -463,6 +465,7 @@ def _write_report_proof(
 def _build_blueprint_from_fixture(fixture: GoldenPathFixture) -> SimulationBlueprint:
     panel_size = fixture.expected_research_intake.intended_synthetic_panel_size
     attributes = _population_attributes_from_fixture(fixture)
+    professional_mode = fixture.expected_research_intake.mode == "professional"
     research_design = ResearchDesign(
         study_type=fixture.expected_study_plan.study_type,
         research_objectives=list(fixture.expected_study_plan.objectives),
@@ -507,19 +510,19 @@ def _build_blueprint_from_fixture(fixture: GoldenPathFixture) -> SimulationBluep
             "coding_mode": "deterministic",
             "theme_granularity": "Climate, discrimination, avoidance, and harassment themes",
             "quote_evidence_required": True,
-            "minimum_theme_count": 6,
+            "minimum_theme_count": 6 if professional_mode else 1,
         },
         report_requirements={
-            "report_tier": "professional",
+            "report_tier": "professional" if professional_mode else "lightweight_exploration",
             "required_sections": [
                 "research_design",
                 "objective_coverage",
                 "standards_alignment_appendix",
             ],
-            "minimum_figures": 6,
-            "minimum_tables": 8,
+            "minimum_figures": 6 if professional_mode else 1,
+            "minimum_tables": 8 if professional_mode else 2,
             "appendix_requirements": ["planned_vs_delivered", "traceable_quote_evidence", "provenance"],
-            "audience_level": "professional",
+            "audience_level": "professional" if professional_mode else "novice",
         },
         disclosure_plan={
             "synthetic_only_warning": True,
@@ -769,6 +772,14 @@ def _invalid_question_roles(question_roles: dict[str, str]) -> list[str]:
     return sorted(role for role in question_roles.values() if role not in allowed)
 
 
+def _invalid_role_assignments(question_roles: dict[str, str]) -> list[str]:
+    invalid: list[str] = []
+    for question_id, role in question_roles.items():
+        if role == "qualitative_probe" and question_id != "q5":
+            invalid.append(f"{question_id}={role}")
+    return invalid
+
+
 def _question_roles_from_fixture(fixture: GoldenPathFixture) -> dict[str, QuestionRole]:
     roles: dict[str, QuestionRole] = {}
     for question_id, role in fixture.expected_study_plan.question_roles.items():
@@ -915,73 +926,3 @@ def _artifact_path(path: Path, workspace: Path) -> str:
 def _sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
-
-def _write_fallback_report_artifacts(report: object, report_dir: Path) -> ReportArtifacts:
-    json_path = report_dir / "report.json"
-    html_path = report_dir / "report.html"
-    pdf_path = report_dir / "report.pdf"
-    checksums_path = report_dir / "checksums.json"
-    payload = _report_payload(report)
-    view = _build_report_view(payload)
-    json_path.write_text(
-        json.dumps(payload, indent=2, sort_keys=True, default=_json_default),
-        encoding="utf-8",
-    )
-    chart_files = _render_charts(view["questions"], report_dir)
-    html = _render_html(view)
-    html_path.write_text(html, encoding="utf-8")
-    _write_multipage_pdf_from_html(html, pdf_path, minimum_pages=12)
-    checksums = {
-        path.name: _checksum(path)
-        for path in [json_path, html_path, pdf_path, *chart_files]
-    }
-    checksums_path.write_text(json.dumps(checksums, indent=2, sort_keys=True), encoding="utf-8")
-    return ReportArtifacts(
-        json_path=json_path,
-        html_path=html_path,
-        pdf_path=pdf_path,
-        checksums_path=checksums_path,
-        chart_paths=chart_files,
-    )
-
-
-def _write_multipage_pdf_from_html(html: str, pdf_path: Path, *, minimum_pages: int) -> None:
-    plain_text = re.sub(r"<[^>]+>", " ", html)
-    words = plain_text.split()
-    if not words:
-        words = ["Golden", "Path", "Proof", "Report"]
-    lines: list[str] = []
-    current: list[str] = []
-    for word in words:
-        current.append(word)
-        if len(" ".join(current)) >= 90:
-            lines.append(" ".join(current))
-            current = []
-    if current:
-        lines.append(" ".join(current))
-    if not lines:
-        lines = ["Golden Path Proof Report"]
-
-    pdf = canvas.Canvas(str(pdf_path), pagesize=A4, pageCompression=1, invariant=1)
-    line_index = 0
-    page_count = 0
-    while line_index < len(lines) or page_count < minimum_pages:
-        page_count += 1
-        y = A4[1] - 48
-        pdf.setFont("Helvetica", 10)
-        pdf.drawString(48, y, f"Golden Path Proof Report - Page {page_count}")
-        y -= 20
-        while line_index < len(lines) and y > 54:
-            pdf.drawString(48, y, lines[line_index][:110])
-            y -= 12
-            line_index += 1
-        if line_index >= len(lines) and page_count < minimum_pages:
-            filler = (
-                "Standards-aligned synthetic research dry-run evidence. "
-                "This page preserves the deterministic fallback PDF footprint when WeasyPrint is unavailable."
-            )
-            while y > 54:
-                pdf.drawString(48, y, filler[:110])
-                y -= 12
-        pdf.showPage()
-    pdf.save()

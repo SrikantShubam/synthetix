@@ -17,6 +17,7 @@ class AnalyticsChart(BaseModel):
     chart_id: str
     title: str
     chart_family: str
+    visual_type: Literal["bar", "horizontal_bar", "likert_stacked", "donut"] = "bar"
     labels: list[str] = Field(default_factory=list)
     values: list[int] = Field(default_factory=list)
     full_labels: list[str] = Field(default_factory=list)
@@ -25,6 +26,7 @@ class AnalyticsChart(BaseModel):
 
 
 class ChartDecision(BaseModel):
+    question_id: str | None = None
     status: Literal["rendered", "suppressed", "replaced_with_table", "replaced_with_evidence_panel"]
     reason: str
 
@@ -147,6 +149,8 @@ class ReportModel(BaseModel):
     analytics: ReportAnalytics = Field(default_factory=ReportAnalytics)
     research_design: ResearchDesign | None = None
     research_intake: ResearchIntake | None = None
+    chart_decisions: list[ChartDecision] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
     objective_coverage: list[ObjectiveCoverage] = Field(default_factory=list)
     sensitivity_notes: list[str] = Field(default_factory=list)
     fieldwork_handoff: list[str] = Field(default_factory=list)
@@ -178,6 +182,7 @@ class ReportModel(BaseModel):
                         chart_id="question:q1",
                         title="Would this concept fit your scenario?",
                         chart_family="question_distribution",
+                        visual_type="bar",
                         labels=["yes", "no"],
                         values=[1, 1],
                         full_labels=["yes", "no"],
@@ -201,6 +206,17 @@ class ReportModel(BaseModel):
                         },
                     ),
                 )
+            ],
+            chart_decisions=[
+                ChartDecision(
+                    question_id="q1",
+                    status="rendered",
+                    reason="Closed-ended distribution has a stable base and chart-safe categorical labels.",
+                )
+            ],
+            warnings=[
+                "Synthetic scenario evidence only.",
+                "Do not infer prevalence, causality, or statistical significance from this report.",
             ],
             executive_findings=[
                 ExecutiveFinding(
@@ -298,6 +314,7 @@ class ReportModel(BaseModel):
                         chart_id="population:region",
                         title="Region composition",
                         chart_family="population_segment",
+                        visual_type="donut",
                         labels=["urban", "rural"],
                         values=[1, 1],
                         full_labels=["urban", "rural"],

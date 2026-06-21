@@ -6,6 +6,7 @@ import re
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from datetime import date, datetime
+from io import BytesIO
 from pathlib import Path
 from typing import Any, cast
 from urllib.parse import urlparse
@@ -16,6 +17,19 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 from jinja2 import Environment, select_autoescape
 from matplotlib.ticker import MaxNLocator
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
+from reportlab.lib.units import inch
+from reportlab.platypus import (
+    Image as ReportImage,
+    PageBreak,
+    Paragraph,
+    SimpleDocTemplate,
+    Spacer,
+    Table,
+    TableStyle,
+)
 
 from synthetix.reporting.models import ReportModel
 
@@ -54,6 +68,16 @@ REPORT_TEMPLATE = """
         <strong>Non-inferential use warning.</strong>
         Synthetic scenario exploration is not representative human research. Do not infer prevalence, causality, or statistical significance from this report.
       </aside>
+      {% if view.warnings %}
+      <section class="summary-card">
+        <h2 id="report-warnings">Report warnings</h2>
+        <ul>
+        {% for item in view.warnings %}
+          <li>{{ item }}</li>
+        {% endfor %}
+        </ul>
+      </section>
+      {% endif %}
       <section class="summary-card">
         <h2 id="executive-summary">Executive summary</h2>
         <p>{{ view.executive_summary }}</p>
@@ -147,6 +171,30 @@ REPORT_TEMPLATE = """
         <li>{{ item }}</li>
       {% endfor %}
       </ul>
+      {% endif %}
+    </section>
+
+    <section id="report-contract" class="report-section">
+      <h2>Report warnings and chart decisions</h2>
+      {% if view.warnings %}
+      <div class="callout-card">
+        <h3>Report warnings</h3>
+        <ul>
+        {% for item in view.warnings %}
+          <li>{{ item }}</li>
+        {% endfor %}
+        </ul>
+      </div>
+      {% endif %}
+      {% if view.chart_decisions %}
+      <div class="callout-card">
+        <h3>Chart decision log</h3>
+        <ul>
+        {% for item in view.chart_decisions %}
+          <li><strong>{{ item.question_id }}</strong>: {{ item.status }}. {{ item.reason }}</li>
+        {% endfor %}
+        </ul>
+      </div>
       {% endif %}
     </section>
 
@@ -445,6 +493,7 @@ class ReportArtifacts:
     pdf_path: Path
     checksums_path: Path
     chart_paths: list[Path]
+    render_mode: str = "weasyprint"
 
 
 def _checksum(path: Path) -> str:
@@ -741,6 +790,14 @@ def _build_questions(payload: dict[str, Any]) -> list[dict[str, Any]]:
         if not table_labels and chart_labels and chart_values:
             table_labels = chart_full_labels or chart_labels
             table_values = chart_values
+        rendered_chart_labels = chart_labels
+        rendered_chart_values = chart_values
+        if not chart and _coerce_text(question.get("question_type")) in {"choice", "likert"}:
+            rendered_chart_labels = labels
+            rendered_chart_values = values
+        elif not chart:
+            rendered_chart_labels = []
+            rendered_chart_values = []
         rows = [
             {
                 "label": label,
@@ -757,9 +814,10 @@ def _build_questions(payload: dict[str, Any]) -> list[dict[str, Any]]:
                 "denominator": denominator,
                 "labels": labels,
                 "values": values,
-                "chart_labels": chart_labels or labels,
-                "chart_values": chart_values or values,
+                "chart_labels": rendered_chart_labels,
+                "chart_values": rendered_chart_values,
                 "chart_family": _coerce_text(chart.get("chart_family")),
+                "chart_visual_type": _coerce_text(chart.get("visual_type"), "bar"),
                 "chart_decision_status": _coerce_text(chart_decision.get("status")),
                 "chart_decision_reason": _coerce_text(chart_decision.get("reason")),
                 "rows": rows,
@@ -1112,6 +1170,15 @@ def _build_report_view(payload: dict[str, Any]) -> dict[str, Any]:
         "executive_findings": _build_executive_findings(payload),
         "research_design": _build_research_design(payload),
         "research_intake": _build_research_intake(payload),
+        "warnings": [_coerce_text(item) for item in _coerce_list(payload.get("warnings"))],
+        "chart_decisions": [
+            {
+                "question_id": _coerce_text(_coerce_mapping(item).get("question_id")),
+                "status": _coerce_text(_coerce_mapping(item).get("status")),
+                "reason": _coerce_text(_coerce_mapping(item).get("reason")),
+            }
+            for item in _coerce_list(payload.get("chart_decisions"))
+        ],
         "population_summary": population_summary,
         "population_rows": population_rows,
         "population_table_number": 1,
@@ -1153,8 +1220,9 @@ def _build_report_view(payload: dict[str, Any]) -> dict[str, Any]:
             {"id": "executive-findings", "label": "Executive findings"},
             {"id": "research-design", "label": "Research design"},
             {"id": "research-intake", "label": "Research intake"},
+            {"id": "report-contract", "label": "Report warnings and chart decisions"},
             {"id": "population-composition", "label": "Population composition"},
-	            {"id": "question-distributions", "label": "Question distributions"},
+		            {"id": "question-distributions", "label": "Question distributions"},
 	            {"id": "question-interpretation", "label": "Question interpretation and implications"},
 	            {"id": "segment-comparisons", "label": "Segment comparisons"},
             {"id": "qualitative-themes", "label": "Qualitative themes and evidence"},
@@ -1189,21 +1257,64 @@ def _render_charts(questions: list[dict[str, Any]], output_dir: Path) -> list[Pa
         axis.set_facecolor("white")
         wrapped_labels = [_wrap_tick_label(label) for label in display_labels]
         chart_family = _coerce_text(question.get("chart_family"))
-        if chart_family == "question_themes":
+        chart_visual_type = _coerce_text(question.get("chart_visual_type"), "bar")
+        if chart_visual_type == "likert_stacked":
+            palette = ["#9ecae1", "#6baed6", "#4292c6", "#2171b5", "#084594", "#08306b"]
+            left = 0
+            bars = []
+            for index, value in enumerate(values):
+                bar = axis.barh(
+                    ["Synthetic responses"],
+                    [value],
+                    left=left,
+                    color=palette[index % len(palette)],
+                    height=0.62,
+                    label=display_labels[index] if index < len(display_labels) else f"Scale {index + 1}",
+                )
+                left += value
+                bars.extend(bar)
+            axis.set_xlabel("Synthetic responses", fontsize=9)
+            axis.legend(loc="upper center", bbox_to_anchor=(0.5, -0.12), ncol=min(3, len(values)))
+            axis.grid(axis="x", color="#d7dee3", linewidth=0.8)
+        elif chart_visual_type == "donut":
+            total = sum(values) or 1
+            bars = axis.pie(
+                values,
+                labels=wrapped_labels,
+                autopct=lambda pct: f"{pct:.0f}%\n({round(total * pct / 100):.0f})" if pct > 0 else "",
+                startangle=90,
+                counterclock=False,
+                wedgeprops={"width": 0.42, "edgecolor": "white"},
+                textprops={"fontsize": 8, "color": "#102a43"},
+            )[0]
+            axis.text(0, 0, f"n = {total}", ha="center", va="center", fontsize=10, color="#102a43")
+            axis.grid(False)
+        elif chart_visual_type == "horizontal_bar" or chart_family == "question_themes":
             bars = axis.barh(wrapped_labels, values, color="#1f5f78", height=0.62)
-            axis.set_xlabel("Theme mentions", fontsize=9)
+            axis.set_xlabel(
+                "Theme mentions" if chart_family == "question_themes" else "Synthetic responses",
+                fontsize=9,
+            )
+            axis.grid(axis="x", color="#d7dee3", linewidth=0.8)
         else:
             bars = axis.bar(wrapped_labels, values, color="#1f5f78", width=0.62)
             axis.set_ylabel("Synthetic responses", fontsize=9)
+            axis.grid(axis="y", color="#d7dee3", linewidth=0.8)
         axis.set_title(_chart_title(question), loc="left", fontsize=11, pad=12)
-        axis.yaxis.set_major_locator(MaxNLocator(integer=True))
-        axis.grid(axis="y", color="#d7dee3", linewidth=0.8)
+        if chart_visual_type == "bar":
+            axis.yaxis.set_major_locator(MaxNLocator(integer=True))
+        elif chart_visual_type == "horizontal_bar" or chart_family == "question_themes":
+            axis.xaxis.set_major_locator(MaxNLocator(integer=True))
+        elif chart_visual_type == "likert_stacked":
+            axis.xaxis.set_major_locator(MaxNLocator(integer=True))
         axis.set_axisbelow(True)
         for spine in ("top", "right"):
             axis.spines[spine].set_visible(False)
         axis.margins(x=0.05)
         for bar, value in zip(bars, values):
-            if chart_family == "question_themes":
+            if chart_visual_type == "donut":
+                continue
+            if chart_visual_type in {"horizontal_bar", "likert_stacked"} or chart_family == "question_themes":
                 axis.text(
                     bar.get_width() + 0.03,
                     bar.get_y() + bar.get_height() / 2,
@@ -1223,8 +1334,12 @@ def _render_charts(questions: list[dict[str, Any]], output_dir: Path) -> list[Pa
                     fontsize=8,
                     color="#102a43",
                 )
-        axis.tick_params(axis="x", labelrotation=0, labelsize=8, pad=8)
-        axis.tick_params(axis="y", labelsize=8)
+        if chart_visual_type == "donut":
+            axis.set(aspect="equal")
+            axis.tick_params(left=False, bottom=False, labelleft=False, labelbottom=False)
+        else:
+            axis.tick_params(axis="x", labelrotation=0, labelsize=8, pad=8)
+            axis.tick_params(axis="y", labelsize=8)
         figure.tight_layout()
         figure.savefig(path, metadata={"Software": "Synthetix"}, dpi=120)
         plt.close(figure)
@@ -1237,6 +1352,298 @@ def _render_html(view: dict[str, Any]) -> str:
     environment = Environment(autoescape=select_autoescape(["html", "xml"]))
     template = environment.from_string(REPORT_TEMPLATE)
     return template.render(view=view, stylesheet_href=REPORT_STYLESHEET.resolve().as_uri())
+
+
+def _chart_file_path(chart_uri: str) -> Path | None:
+    if not chart_uri:
+        return None
+    parsed = urlparse(chart_uri)
+    if parsed.scheme == "file":
+        return Path(parsed.path.lstrip("/"))
+    path = Path(chart_uri)
+    return path if path.exists() else None
+
+
+def _reportlab_styles() -> dict[str, ParagraphStyle]:
+    base = getSampleStyleSheet()
+    return {
+        "title": ParagraphStyle(
+            "SynthetixTitle",
+            parent=base["Title"],
+            fontSize=20,
+            leading=24,
+            textColor=colors.HexColor("#102a43"),
+            spaceAfter=10,
+        ),
+        "h1": ParagraphStyle(
+            "SynthetixH1",
+            parent=base["Heading1"],
+            fontSize=15,
+            leading=18,
+            textColor=colors.HexColor("#102a43"),
+            spaceBefore=8,
+            spaceAfter=6,
+        ),
+        "h2": ParagraphStyle(
+            "SynthetixH2",
+            parent=base["Heading2"],
+            fontSize=12,
+            leading=15,
+            textColor=colors.HexColor("#102a43"),
+            spaceBefore=6,
+            spaceAfter=4,
+        ),
+        "body": ParagraphStyle(
+            "SynthetixBody",
+            parent=base["BodyText"],
+            fontSize=9,
+            leading=12,
+            textColor=colors.HexColor("#1f2933"),
+            spaceAfter=4,
+        ),
+        "small": ParagraphStyle(
+            "SynthetixSmall",
+            parent=base["BodyText"],
+            fontSize=8,
+            leading=10,
+            textColor=colors.HexColor("#486581"),
+            spaceAfter=3,
+        ),
+    }
+
+
+def _truncate(text: str, limit: int = 180) -> str:
+    compact = re.sub(r"\s+", " ", text).strip()
+    if len(compact) <= limit:
+        return compact
+    return compact[: limit - 1].rstrip() + "…"
+
+
+def _reportlab_table(rows: list[list[str]], *, column_widths: list[float] | None = None) -> Table:
+    table = Table(rows, colWidths=column_widths, repeatRows=1)
+    table.setStyle(
+        TableStyle(
+            [
+                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#d9e2ec")),
+                ("TEXTCOLOR", (0, 0), (-1, 0), colors.HexColor("#102a43")),
+                ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                ("GRID", (0, 0), (-1, -1), 0.35, colors.HexColor("#bcccdc")),
+                ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                ("FONTSIZE", (0, 0), (-1, -1), 8),
+                ("LEADING", (0, 0), (-1, -1), 10),
+                ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f7fafc")]),
+            ]
+        )
+    )
+    return table
+
+
+def _render_pdf_reportlab(report: ReportModel, view: dict[str, Any], pdf_path: Path) -> None:
+    styles = _reportlab_styles()
+    research_intake = report.research_intake
+    research_design = report.research_design
+    question_views = {
+        str(question.get("question_id")): question
+        for question in view.get("questions", [])
+        if isinstance(question, Mapping)
+    }
+    story: list[Any] = []
+    doc = SimpleDocTemplate(
+        str(pdf_path),
+        pagesize=A4,
+        leftMargin=42,
+        rightMargin=42,
+        topMargin=42,
+        bottomMargin=42,
+        title=report.title,
+        author="Synthetix",
+    )
+
+    story.extend(
+        [
+            Paragraph(report.title, styles["title"]),
+            Paragraph(f"Run {report.run_id} | Generated {report.generated_at.isoformat()}", styles["small"]),
+            Paragraph(report.purpose, styles["body"]),
+            Paragraph(
+                "Non-inferential synthetic evidence only. Do not infer prevalence, causality, or statistical significance.",
+                styles["body"],
+            ),
+            Spacer(1, 0.12 * inch),
+            Paragraph("Executive summary", styles["h1"]),
+            Paragraph(report.executive_summary, styles["body"]),
+            PageBreak(),
+            Paragraph("Population composition", styles["h1"]),
+        ]
+    )
+
+    population_rows = [["Segment", "Category", "Count", "Share"]]
+    for composition in report.segment_composition:
+        for segment in composition.segments:
+            population_rows.append(
+                [
+                    composition.attribute,
+                    segment.value,
+                    str(segment.count),
+                    f"{segment.share:.0%}",
+                ]
+            )
+    if len(population_rows) > 1:
+        story.append(_reportlab_table(population_rows, column_widths=[1.6 * inch, 2.2 * inch, 0.9 * inch, 0.9 * inch]))
+    story.append(Spacer(1, 0.14 * inch))
+
+    story.extend(
+        [
+            Paragraph("Research intake", styles["h1"]),
+            Paragraph(
+                (
+                    f"Target population size: {research_intake.target_population_size if research_intake else 'Not stated'} | "
+                    f"Synthetic panel size: {research_intake.intended_synthetic_panel_size if research_intake else 'Not stated'} | "
+                    f"Extraction method: {(research_intake.extraction_method if research_intake else 'unknown') or 'unknown'}"
+                ),
+                styles["body"],
+            ),
+            Paragraph(
+                research_intake.research_context if research_intake else "No structured intake was attached.",
+                styles["body"],
+            ),
+            Paragraph("Research design", styles["h1"]),
+            Paragraph(
+                "Objectives: " + "; ".join(research_design.research_objectives) if research_design else "Objectives: Not stated",
+                styles["body"],
+            ),
+            Paragraph(
+                "Decision questions: " + "; ".join(research_design.decision_questions)
+                if research_design
+                else "Decision questions: Not stated",
+                styles["body"],
+            ),
+            Paragraph(
+                "Assumptions: " + "; ".join(research_design.assumptions)
+                if research_design
+                else "Assumptions: Not stated",
+                styles["body"],
+            ),
+            Paragraph("Question distributions", styles["h1"]),
+        ]
+    )
+    story.append(Paragraph("Report warnings and chart decisions", styles["h1"]))
+    story.append(Paragraph("Report warnings", styles["h2"]))
+    for item in report.warnings:
+        story.append(Paragraph(item, styles["body"]))
+    story.append(Paragraph("Chart decision log", styles["h2"]))
+    for decision in report.chart_decisions:
+        story.append(
+            Paragraph(
+                f"{decision.question_id or 'report'} | {decision.status} | {decision.reason}",
+                styles["body"],
+            )
+        )
+
+    for question in report.questions:
+        story.append(PageBreak())
+        question_view = question_views.get(question.question_id, {})
+        story.append(Paragraph(f"{question.question_id}: {question.prompt}", styles["h2"]))
+        story.append(
+            Paragraph(
+                f"Base n = {question.denominators.valid_responses}. "
+                f"Chart decision: {question.chart_decision.status if question.chart_decision else 'n/a'}. "
+                f"{question.chart_decision.reason if question.chart_decision else ''}",
+                styles["small"],
+            )
+        )
+        chart_path = _chart_file_path(str(question_view.get("chart_path", "")))
+        if chart_path is not None and chart_path.exists():
+            story.append(ReportImage(str(chart_path), width=6.0 * inch, height=3.45 * inch))
+            story.append(Spacer(1, 0.08 * inch))
+        if question.distribution.labels:
+            rows = [["Response label", "Count"]]
+            rows.extend(
+                [[label, str(value)] for label, value in zip(question.distribution.labels, question.distribution.values, strict=False)]
+            )
+            story.append(_reportlab_table(rows, column_widths=[4.9 * inch, 1.0 * inch]))
+        if question.themes:
+            theme_rows = [["Theme", "Count", "Supporting quotes"]]
+            theme_rows.extend(
+                [
+                    [theme.label, str(theme.count), ", ".join(theme.supporting_quote_ids[:4])]
+                    for theme in question.themes
+                ]
+            )
+            story.append(_reportlab_table(theme_rows, column_widths=[3.6 * inch, 0.8 * inch, 1.5 * inch]))
+        for quote in question.quotes[:4]:
+            story.append(Paragraph("Quote: " + _truncate(quote, 220), styles["body"]))
+        if question.segment_cuts:
+            segment_rows = [["Segment", "Base", "Status"]]
+            segment_rows.extend(
+                [
+                    [
+                        f"{segment.attribute}={segment.value}",
+                        str(segment.base_count),
+                        segment.suppression_reason if segment.suppressed else "shown",
+                    ]
+                    for segment in question.segment_cuts[:12]
+                ]
+            )
+            story.append(_reportlab_table(segment_rows, column_widths=[2.7 * inch, 0.6 * inch, 2.7 * inch]))
+        story.append(Spacer(1, 0.18 * inch))
+
+    story.extend(
+        [
+            PageBreak(),
+            Paragraph("Executive findings", styles["h1"]),
+        ]
+    )
+    for finding in report.executive_findings:
+        story.append(Paragraph(f"{finding.title}: {finding.summary}", styles["body"]))
+
+    story.extend(
+        [
+            PageBreak(),
+            Paragraph("Methodology", styles["h1"]),
+            Paragraph(report.methodology.approach, styles["body"]),
+            Paragraph(report.methodology.response_generation, styles["body"]),
+            Paragraph("Objective coverage", styles["h1"]),
+        ]
+    )
+    for coverage in report.objective_coverage:
+        story.append(
+            Paragraph(
+                f"{coverage.objective} | {coverage.status} | Questions: {', '.join(coverage.covered_question_ids)} | {coverage.notes}",
+                styles["body"],
+            )
+        )
+
+    story.append(PageBreak())
+    story.append(Paragraph("Fieldwork handoff", styles["h1"]))
+    for item in report.fieldwork_handoff:
+        story.append(Paragraph(item, styles["body"]))
+    story.append(Paragraph("Limitations", styles["h1"]))
+    for item in report.limitations:
+        story.append(Paragraph(item, styles["body"]))
+    story.append(Paragraph("Provenance", styles["h1"]))
+    story.append(Paragraph(f"Model: {report.provenance.model_id}", styles["body"]))
+    story.append(Paragraph(f"Provider: {report.provenance.provider}", styles["body"]))
+    story.append(PageBreak())
+    story.append(Paragraph("Standards-aligned disclosure appendix", styles["h1"]))
+    standards_alignment = research_design.standards_alignment if research_design else None
+    if standards_alignment is not None:
+        standards_mapping = (
+            standards_alignment.model_dump()
+            if hasattr(standards_alignment, "model_dump")
+            else dict(standards_alignment)
+        )
+        for family, notes in standards_mapping.items():
+            values = notes if isinstance(notes, list) else [str(notes)]
+            story.append(Paragraph(f"{family}: {'; '.join(str(value) for value in values)}", styles["body"]))
+    story.append(Paragraph("Technical appendix", styles["h1"]))
+    story.append(Paragraph(json.dumps(report.manifest, indent=2, default=_json_default), styles["small"]))
+    story.append(PageBreak())
+    story.append(Paragraph("Quote evidence appendix", styles["h1"]))
+    for question in report.questions:
+        for quote in question.quotes[:8]:
+            story.append(Paragraph(f"{question.question_id}: {_truncate(quote, 220)}", styles["body"]))
+
+    doc.build(story)
 
 
 def _load_weasyprint() -> tuple[Any, Any]:
@@ -1280,7 +1687,12 @@ def render_report(report: ReportModel, output_dir: Path) -> ReportArtifacts:
     chart_files = _render_charts(view["questions"], output_dir)
     html = _render_html(view)
     html_path.write_text(html, encoding="utf-8")
-    _render_pdf(html, pdf_path, output_dir.resolve().as_uri())
+    render_mode = "weasyprint"
+    try:
+        _render_pdf(html, pdf_path, output_dir.resolve().as_uri())
+    except RuntimeError:
+        _render_pdf_reportlab(report, view, pdf_path)
+        render_mode = "reportlab_structured"
 
     files = [json_path, html_path, pdf_path, *chart_files]
     checksums = {path.name: _checksum(path) for path in files}
@@ -1291,4 +1703,5 @@ def render_report(report: ReportModel, output_dir: Path) -> ReportArtifacts:
         pdf_path=pdf_path,
         checksums_path=checksums_path,
         chart_paths=chart_files,
+        render_mode=render_mode,
     )

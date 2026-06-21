@@ -107,8 +107,12 @@ def test_build_report_canonicalizes_choice_and_likert_answers() -> None:
     assert [quote.quote_id for quote in choice.quote_evidence] == ["q_choice:p1", "q_choice:p2", "q_choice:p3"]
     assert choice.chart is not None
     assert choice.chart.chart_family == "question_distribution"
+    assert choice.chart.visual_type == "donut"
     assert choice.chart.values == [2, 1]
-    assert choice.chart.option["series"][0]["data"] == [2, 1]
+    assert choice.chart.option["series"][0]["data"] == [
+        {"name": "Yes", "value": 2},
+        {"name": "No", "value": 1},
+    ]
 
     likert = report.questions[1]
     assert likert.question_type == "likert"
@@ -120,6 +124,7 @@ def test_build_report_canonicalizes_choice_and_likert_answers() -> None:
     assert likert.denominators.invalid_responses == 1
     assert likert.chart is not None
     assert likert.chart.chart_family == "question_distribution"
+    assert likert.chart.visual_type == "likert_stacked"
 
 
 def test_build_report_uses_open_text_as_traceable_evidence() -> None:
@@ -211,6 +216,7 @@ def test_build_report_includes_segment_composition_and_suppressed_cuts() -> None
     assert cuts[("region", "rural")].distribution.labels == []
     assert cuts[("region", "rural")].base_count == 1
     assert report.analytics.population_charts[0].chart_family == "population_segment"
+    assert report.analytics.population_charts[0].visual_type == "donut"
     assert report.analytics.population_charts[0].values == [2, 1]
 
 
