@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field
 
 from synthetix.benchmarking.golden_path import (
     ContractComparison,
+    GoldenPathFixture,
     GoldenPathProofSummary,
     load_golden_path_fixtures,
     validate_golden_path_fixture_set,
@@ -97,6 +98,7 @@ def review_golden_path_workspace(
     else:
         proof_summary = GoldenPathProofSummary.model_validate_json(proof_file.read_text(encoding="utf-8"))
         _review_report_artifacts(workspace, proof_summary, findings)
+        _review_fixture_report_proofs(workspace, proof_summary, fixtures, findings)
 
     if proof_summary is not None:
         for proof in proof_summary.proofs:
@@ -212,6 +214,10 @@ def review_golden_path_workspace(
         reviewed_artifacts.extend(proof_summary.report_artifacts)
         if proof_summary.report_quality_path is not None:
             reviewed_artifacts.append(proof_summary.report_quality_path)
+        for report_proof in proof_summary.fixture_report_proofs:
+            reviewed_artifacts.extend(report_proof.report_artifacts)
+            if report_proof.report_quality_path is not None:
+                reviewed_artifacts.append(report_proof.report_quality_path)
     review = GoldenPathReview(
         passed=passed,
         summary=_summarize_findings(findings),
@@ -428,6 +434,128 @@ def _review_report_artifacts(
                 remediation="Generate the proof report through the real reporting path and meet the professional depth and evidence gates.",
             )
         )
+
+
+def _review_fixture_report_proofs(
+    workspace: Path,
+    proof_summary: GoldenPathProofSummary,
+    fixtures: list[GoldenPathFixture],
+    findings: list[ReviewFinding],
+) -> None:
+    expected_fixture_ids = {fixture.fixture_id for fixture in fixtures}
+    report_proofs = {proof.fixture_id: proof for proof in proof_summary.fixture_report_proofs}
+    missing = sorted(expected_fixture_ids - set(report_proofs))
+    if missing:
+        findings.append(
+            ReviewFinding(
+                category="report_generation",
+                severity="error",
+                code="missing_fixture_report_proof",
+                message="Golden-path proof does not classify every fixture through the report loop.",
+                expected=", ".join(sorted(expected_fixture_ids)),
+                observed=", ".join(sorted(report_proofs)) or "none",
+                remediation="Regenerate proof artifacts with fixture_report_proofs for every validation fixture.",
+            )
+        )
+        return
+    for report_proof in proof_summary.fixture_report_proofs:
+        if report_proof.expected_acceptance == "blocked":
+            if report_proof.generated or report_proof.accepted:
+                findings.append(
+                    ReviewFinding(
+                        category="report_generation",
+                        severity="error",
+                        code="blocked_fixture_generated_report",
+                        message=f"{report_proof.fixture_id}: blocked intake fixture generated or accepted a report.",
+                        expected="generated=false and accepted=false",
+                        observed=f"generated={report_proof.generated}, accepted={report_proof.accepted}",
+                        remediation="Do not generate professional reports for blocked document intake.",
+                    )
+                )
+            if "professional_document_intake" not in report_proof.failed_hard_gates:
+                findings.append(
+                    ReviewFinding(
+                        category="report_generation",
+                        severity="error",
+                        code="blocked_fixture_missing_gate",
+                        message=f"{report_proof.fixture_id}: blocked fixture is missing the document-intake hard gate.",
+                        expected="professional_document_intake",
+                        observed=", ".join(report_proof.failed_hard_gates),
+                        remediation="Record the intake-blocking gate in fixture report proof.",
+                    )
+                )
+            continue
+        if not report_proof.generated:
+            findings.append(
+                ReviewFinding(
+                    category="report_generation",
+                    severity="error",
+                    code="fixture_report_not_generated",
+                    message=f"{report_proof.fixture_id}: non-blocked fixture did not generate report artifacts.",
+                    expected="generated=true",
+                    observed="generated=false",
+                    remediation="Run the fixture through the normal report renderer or mark it blocked with a real gate.",
+                )
+            )
+            continue
+        missing_artifacts = [
+            artifact
+            for artifact in report_proof.report_artifacts
+            if not (workspace / artifact).exists()
+        ]
+        if missing_artifacts:
+            findings.append(
+                ReviewFinding(
+                    category="report_generation",
+                    severity="error",
+                    code="missing_fixture_report_artifact",
+                    artifact_paths=missing_artifacts,
+                    message=f"{report_proof.fixture_id}: fixture report proof references missing artifacts.",
+                    expected="Every listed fixture report artifact exists.",
+                    observed=", ".join(missing_artifacts),
+                    remediation="Regenerate fixture-level report proof artifacts.",
+                )
+            )
+        if report_proof.expected_acceptance == "lightweight_only" and report_proof.accepted:
+            findings.append(
+                ReviewFinding(
+                    category="report_generation",
+                    severity="error",
+                    code="lightweight_fixture_passed_professional_gate",
+                    message=f"{report_proof.fixture_id}: novice fixture was accepted as professional quality.",
+                    expected="accepted=false for lightweight-only proof.",
+                    observed="accepted=true",
+                    remediation="Keep novice output lightweight and prevent it from satisfying professional gates.",
+                )
+            )
+        if report_proof.expected_acceptance == "rejected" and (
+            report_proof.accepted or not report_proof.failed_hard_gates
+        ):
+            findings.append(
+                ReviewFinding(
+                    category="report_generation",
+                    severity="error",
+                    code="rejected_fixture_missing_failure",
+                    message=f"{report_proof.fixture_id}: rejected professional fixture did not expose failed gates.",
+                    expected="accepted=false with failed_hard_gates populated",
+                    observed=f"accepted={report_proof.accepted}, failed={report_proof.failed_hard_gates}",
+                    remediation="Record the professional gate failure, including tiny-panel or depth failures.",
+                )
+            )
+        if report_proof.expected_acceptance == "accepted" and (
+            not report_proof.accepted or report_proof.failed_hard_gates
+        ):
+            findings.append(
+                ReviewFinding(
+                    category="report_generation",
+                    severity="error",
+                    code="accepted_fixture_failed_gate",
+                    message=f"{report_proof.fixture_id}: accepted professional fixture did not pass cleanly.",
+                    expected="accepted=true with no failed_hard_gates",
+                    observed=f"accepted={report_proof.accepted}, failed={report_proof.failed_hard_gates}",
+                    remediation="Repair the professional report pipeline before claiming the fixture passes.",
+                )
+            )
 
 
 def _summarize_findings(findings: list[ReviewFinding]) -> dict[str, ReviewCategorySummary]:

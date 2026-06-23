@@ -89,6 +89,11 @@
       "id": "C018",
       "source": "docs/specs/11-report-chart-quality-recovery.md",
       "text": "Professional proof artifacts must use the real report renderer path and may not substitute plaintext fallback PDFs. Report quality scoring must cap failed hard-gate results below threshold, and backend chart generation must choose an explicit visual type or a suppression/evidence-panel path instead of defaulting every question to the same chart form."
+    },
+    {
+      "id": "C019",
+      "source": "docs/specs/12-research-basis-professional-report-recovery.md, research/golden_paper_contract.json",
+      "text": "Professional golden-path proof must operationalize the public digital-persona survey research basis: distributional evaluation, segment/equity checks, multivariate-structure limitations, retrieval/context limits, and human-validation handoff. Presence-only report gates, toy professional panels, generic standards text, and unauditable chart decisions cannot pass professional quality."
     }
   ],
   "non_negotiable": [
@@ -105,7 +110,8 @@
     "C015",
     "C016",
     "C017",
-    "C018"
+    "C018",
+    "C019"
   ],
   "retired": []
 }

@@ -13,6 +13,7 @@ from pydantic import BaseModel, Field
 from synthetix.reporting.models import ReportModel
 from synthetix.reporting.renderer import ReportArtifacts
 from synthetix.reporting.renderer import _chart_labels as renderer_chart_labels
+from synthetix.research.basis_alignment import ResearchBasisAlignment
 
 
 CATEGORY_WEIGHTS: dict[str, float] = {
@@ -24,6 +25,8 @@ CATEGORY_WEIGHTS: dict[str, float] = {
     "reproducibility_and_artifact_integrity": 10.0,
 }
 PASSING_THRESHOLD = 85.0
+PROFESSIONAL_MIN_SYNTHETIC_PANEL_SIZE = 100
+MAX_TRACEABLE_QUOTE_DEPTH_CREDIT_PER_BLOCK = 20
 REQUIRED_REPORT_SECTIONS: tuple[str, ...] = (
     "title",
     "executive_summary",
@@ -119,6 +122,14 @@ class ReportQualityInput(BaseModel):
     non_inferential_warning_present: bool = False
     report_warnings: list[str] = Field(default_factory=list)
     chart_decisions: list[dict[str, str]] = Field(default_factory=list)
+    sample_source_summary: str = ""
+    synthetic_panel_summary: str = ""
+    synthetic_panel_size: int | None = None
+    questionnaire_instrument_summary: str = ""
+    nonresponse_weighting_summary: str = ""
+    limitations_texts: list[str] = Field(default_factory=list)
+    provenance_texts: list[str] = Field(default_factory=list)
+    fieldwork_handoff_texts: list[str] = Field(default_factory=list)
     claim_texts: list[str] = Field(default_factory=list)
     attrition: AttritionEvidence = Field(default_factory=AttritionEvidence)
     report_depth: ReportDepthEvidence = Field(default_factory=ReportDepthEvidence)
@@ -133,6 +144,7 @@ class ReportQualityInput(BaseModel):
     analysis_plan_summary: str = ""
     qualitative_coding_summary: str = ""
     standards_alignment_texts: list[str] = Field(default_factory=list)
+    research_basis_alignment_texts: list[str] = Field(default_factory=list)
     benchmark_wording_texts: list[str] = Field(default_factory=list)
     typed_answer_issues: list[str] = Field(default_factory=list)
     rendered_text_artifacts: list[str] = Field(default_factory=list)
@@ -209,6 +221,14 @@ class ReportQualityScorer:
                 report_input.research_design_tier,
                 report_input.chart_decisions,
             ),
+            self._check_rendered_chart_decision_visual_types(
+                report_input.research_design_tier,
+                report_input.chart_decisions,
+            ),
+            self._check_replacement_chart_decision_types(
+                report_input.research_design_tier,
+                report_input.chart_decisions,
+            ),
             self._check_rendered_text_artifacts(report_input.rendered_text_artifacts),
             self._check_pdf_rendering_mode(
                 report_input.research_design_tier,
@@ -217,6 +237,10 @@ class ReportQualityScorer:
             self._check_attrition(report_input.attrition),
             self._check_report_depth(report_input.report_depth),
             self._check_research_design_requirement(report_input.research_design_tier),
+            self._check_professional_synthetic_panel_size(
+                report_input.research_design_tier,
+                report_input.synthetic_panel_size,
+            ),
             self._check_objective_coverage(
                 report_input.research_design_tier,
                 report_input.objective_coverage,
@@ -225,12 +249,21 @@ class ReportQualityScorer:
             self._check_standards_alignment(
                 report_input.research_design_tier,
                 report_input.assumptions,
-                report_input.target_population_summary,
-                report_input.sampling_frame_summary,
+                report_input.sample_source_summary or report_input.target_population_summary,
+                report_input.synthetic_panel_summary or report_input.sampling_frame_summary,
+                report_input.questionnaire_instrument_summary,
                 report_input.segmentation_plan_summary,
+                report_input.nonresponse_weighting_summary,
                 report_input.analysis_plan_summary,
                 report_input.qualitative_coding_summary,
+                report_input.limitations_texts,
+                report_input.provenance_texts,
+                report_input.fieldwork_handoff_texts,
                 report_input.standards_alignment_texts,
+            ),
+            self._check_research_basis_alignment(
+                report_input.research_design_tier,
+                report_input.research_basis_alignment_texts,
             ),
             self._check_benchmark_wording(report_input.benchmark_wording_texts),
         ]
@@ -252,6 +285,55 @@ class ReportQualityScorer:
             accepted=accepted,
             weighted_breakdown=weighted_breakdown,
             hard_gates=hard_gates,
+        )
+
+    def _check_rendered_chart_decision_visual_types(
+        self,
+        tier: str,
+        chart_decisions: list[dict[str, str]],
+    ) -> HardGateResult:
+        if tier != "professional":
+            return HardGateResult(
+                name="chart_decision_missing_visual_type",
+                passed=True,
+                detail="Rendered chart visual type is optional for lightweight exploration reports.",
+            )
+        missing = [
+            item.get("question_id", "unknown_question")
+            for item in chart_decisions
+            if item.get("status") == "rendered" and not item.get("visual_type")
+        ]
+        return HardGateResult(
+            name="chart_decision_missing_visual_type",
+            passed=not missing,
+            detail="Every rendered professional chart decision exposes a visual type."
+            if not missing
+            else f"Rendered chart decisions missing visual type for: {missing}",
+        )
+
+    def _check_replacement_chart_decision_types(
+        self,
+        tier: str,
+        chart_decisions: list[dict[str, str]],
+    ) -> HardGateResult:
+        if tier != "professional":
+            return HardGateResult(
+                name="chart_decision_missing_replacement_type",
+                passed=True,
+                detail="Replacement chart type is optional for lightweight exploration reports.",
+            )
+        missing = [
+            item.get("question_id", "unknown_question")
+            for item in chart_decisions
+            if item.get("status") in {"replaced_with_table", "replaced_with_evidence_panel"}
+            and not item.get("replacement_type")
+        ]
+        return HardGateResult(
+            name="chart_decision_missing_replacement_type",
+            passed=not missing,
+            detail="Every professional chart replacement decision exposes a replacement type."
+            if not missing
+            else f"Replacement chart decisions missing replacement type for: {missing}",
         )
 
     def _check_typed_answer_integrity(self, issues: list[str]) -> HardGateResult:
@@ -491,6 +573,32 @@ class ReportQualityScorer:
             else "Lightweight exploration plans may execute but cannot pass professional report quality gates.",
         )
 
+    def _check_professional_synthetic_panel_size(
+        self,
+        tier: str,
+        synthetic_panel_size: int | None,
+    ) -> HardGateResult:
+        if tier != "professional":
+            return HardGateResult(
+                name="professional_synthetic_panel_size",
+                passed=True,
+                detail="Professional synthetic panel size is optional for lightweight exploration reports.",
+            )
+        passed = (
+            synthetic_panel_size is not None
+            and synthetic_panel_size >= PROFESSIONAL_MIN_SYNTHETIC_PANEL_SIZE
+        )
+        return HardGateResult(
+            name="professional_synthetic_panel_size",
+            passed=passed,
+            detail="Professional synthetic panel size meets the configured dry-run minimum."
+            if passed
+            else (
+                "Professional synthetic panel size must be at least "
+                f"{PROFESSIONAL_MIN_SYNTHETIC_PANEL_SIZE}; observed {synthetic_panel_size}."
+            ),
+        )
+
     def _check_objective_coverage(
         self,
         tier: str,
@@ -510,10 +618,18 @@ class ReportQualityScorer:
                 detail="Missing objective coverage or decision questions.",
             )
         missing = []
+        allowed_decision_questions = {str(question).strip() for question in decision_questions}
         for item in objective_coverage:
             covered = item.get("covered_question_ids")
             status = str(item.get("status", ""))
-            if not isinstance(covered, list) or not covered or status == "gap":
+            decision_question = str(item.get("decision_question") or "").strip()
+            if (
+                not isinstance(covered, list)
+                or not covered
+                or status == "gap"
+                or not decision_question
+                or decision_question not in allowed_decision_questions
+            ):
                 missing.append(str(item.get("objective", "unknown_objective")))
         return HardGateResult(
             name="research_objectives_covered",
@@ -527,11 +643,16 @@ class ReportQualityScorer:
         self,
         tier: str,
         assumptions: list[str],
-        target_population_summary: str,
-        sampling_frame_summary: str,
+        sample_source_summary: str,
+        synthetic_panel_summary: str,
+        questionnaire_instrument_summary: str,
         segmentation_plan_summary: str,
+        nonresponse_weighting_summary: str,
         analysis_plan_summary: str,
         qualitative_coding_summary: str,
+        limitations_texts: list[str],
+        provenance_texts: list[str],
+        fieldwork_handoff_texts: list[str],
         standards_alignment_texts: list[str],
     ) -> HardGateResult:
         if tier != "professional":
@@ -543,17 +664,55 @@ class ReportQualityScorer:
         missing = []
         if not assumptions:
             missing.append("assumptions")
-        if not target_population_summary.strip():
-            missing.append("target_population")
-        if not sampling_frame_summary.strip():
-            missing.append("simulation_frame")
-        if not segmentation_plan_summary.strip():
-            missing.append("segmentation_plan")
-        if not analysis_plan_summary.strip():
-            missing.append("analysis_plan")
-        if not qualitative_coding_summary.strip():
-            missing.append("qualitative_coding_plan")
-        if not standards_alignment_texts:
+        disclosure_requirements = [
+            (
+                "sample_source",
+                sample_source_summary,
+                ("sample", "source", "population", "respondent"),
+            ),
+            (
+                "synthetic_panel",
+                synthetic_panel_summary,
+                ("synthetic", "panel", "respondent", "size"),
+            ),
+            (
+                "questionnaire_instrument",
+                questionnaire_instrument_summary,
+                ("questionnaire", "instrument", "prompt", "survey", "question"),
+            ),
+            (
+                "base_size_suppression",
+                segmentation_plan_summary,
+                ("base", "suppression", "suppress", "minimum", "n=", "segment"),
+            ),
+            (
+                "nonresponse_or_weighting",
+                nonresponse_weighting_summary,
+                ("nonresponse", "weight", "weighting", "quota", "response rate", "refusal"),
+            ),
+            (
+                "analysis",
+                analysis_plan_summary,
+                ("analysis", "topline", "cross", "theme", "sensitivity", "benchmark"),
+            ),
+            (
+                "qualitative_coding",
+                qualitative_coding_summary,
+                ("coding", "theme", "quote", "qualitative"),
+            ),
+        ]
+        missing.extend(
+            name
+            for name, text, markers in disclosure_requirements
+            if not _has_disclosure_markers(text, markers)
+        )
+        if not _has_disclosure_markers(" ".join(limitations_texts), ("limitation", "exploratory", "do not infer", "not representative")):
+            missing.append("limitations")
+        if not _has_disclosure_markers(" ".join(provenance_texts), ("model", "provider", "protocol", "manifest", "blueprint")):
+            missing.append("provenance")
+        if not _has_disclosure_markers(" ".join(fieldwork_handoff_texts), ("fieldwork", "handoff", "human", "validation", "next step")):
+            missing.append("fieldwork_handoff")
+        if not _has_disclosure_markers(" ".join(standards_alignment_texts), ("sample", "source", "panel", "questionnaire", "instrument", "suppression", "weight", "nonresponse", "analysis", "coding", "limitation", "provenance", "fieldwork")):
             missing.append("standards_alignment")
         return HardGateResult(
             name="standards_alignment_disclosure_complete",
@@ -561,6 +720,26 @@ class ReportQualityScorer:
             detail="Professional report includes study-plan and standards-aligned disclosure coverage."
             if not missing
             else f"Missing disclosure coverage for: {missing}",
+        )
+
+    def _check_research_basis_alignment(
+        self,
+        tier: str,
+        alignment_texts: list[str],
+    ) -> HardGateResult:
+        if tier != "professional":
+            return HardGateResult(
+                name="research_basis_alignment_complete",
+                passed=True,
+                detail="Research-basis alignment is optional for lightweight exploration reports.",
+            )
+        alignment = ResearchBasisAlignment.from_texts(alignment_texts)
+        return HardGateResult(
+            name="research_basis_alignment_complete",
+            passed=alignment.complete,
+            detail="Professional report discloses alignment with the digital-persona survey research basis."
+            if alignment.complete
+            else f"Missing research-basis alignment markers: {alignment.missing_markers}",
         )
 
     def _check_benchmark_wording(self, wording_texts: list[str]) -> HardGateResult:
@@ -663,6 +842,7 @@ def build_quality_input(report: ReportModel, artifacts: ReportArtifacts) -> Repo
     analysis_plan_summary = ""
     qualitative_coding_summary = ""
     standards_alignment_texts: list[str] = []
+    research_basis_alignment_texts: list[str] = []
     benchmark_wording_texts: list[str] = []
     if research_design is not None:
         target_population_summary = "; ".join(
@@ -704,6 +884,54 @@ def build_quality_input(report: ReportModel, artifacts: ReportArtifacts) -> Repo
         benchmark_wording_texts = list(research_design.analysis_plan.benchmark_checks) + list(
             research_design.disclosure_plan.data_quality_notes
         )
+        research_basis_alignment_texts = [
+            *research_design.analysis_plan.toplines,
+            *research_design.analysis_plan.cross_tabs,
+            *research_design.analysis_plan.sensitivity_checks,
+            *research_design.analysis_plan.benchmark_checks,
+            *research_design.disclosure_plan.data_quality_notes,
+            *research_design.assumptions,
+        ]
+    research_intake = report.research_intake
+    sample_source_summary = ""
+    synthetic_panel_summary = ""
+    questionnaire_instrument_summary = ""
+    nonresponse_weighting_summary = ""
+    if research_intake is not None:
+        sample_source_summary = "; ".join(
+            [
+                "Sample source",
+                research_intake.target_population_summary,
+                f"source sample size {research_intake.source_sample_size}"
+                if research_intake.source_sample_size is not None
+                else "",
+                f"target population size {research_intake.target_population_size}"
+                if research_intake.target_population_size is not None
+                else "",
+            ]
+        ).strip("; ").strip()
+        synthetic_panel_summary = "; ".join(
+            [
+                "Synthetic panel",
+                f"synthetic panel size {research_intake.intended_synthetic_panel_size}",
+                f"mode {research_intake.mode}",
+            ]
+        )
+        questionnaire_instrument_summary = "; ".join(
+            [
+                "Questionnaire instrument",
+                *research_intake.questionnaire_signals,
+                *list(research_intake.question_rationales.values())[:3],
+            ]
+        )
+    if research_design is not None:
+        nonresponse_weighting_summary = "; ".join(
+            [
+                "Nonresponse weighting",
+                ", ".join(research_design.sampling_or_simulation_frame.quotas_or_weights),
+                ", ".join(research_design.sampling_or_simulation_frame.uncovered_groups),
+            ]
+        ).strip("; ").strip()
     return ReportQualityInput(
         category_scores=_derive_category_scores(report, checksums),
         chart_labels=chart_labels,
@@ -733,6 +961,8 @@ def build_quality_input(report: ReportModel, artifacts: ReportArtifacts) -> Repo
                 "question_id": str(item.question_id or ""),
                 "status": item.status,
                 "reason": item.reason,
+                "visual_type": item.visual_type or "",
+                "replacement_type": item.replacement_type or "",
             }
             for item in report.chart_decisions
         ],
@@ -745,11 +975,29 @@ def build_quality_input(report: ReportModel, artifacts: ReportArtifacts) -> Repo
                     "question_id": str(item.question_id or ""),
                     "status": item.status,
                     "reason": item.reason,
+                    "visual_type": item.visual_type or "",
+                    "replacement_type": item.replacement_type or "",
                 }
                 for item in report.chart_decisions
             ],
         ),
         pdf_rendering_mode=getattr(artifacts, "render_mode", "unknown"),
+        sample_source_summary=sample_source_summary,
+        synthetic_panel_summary=synthetic_panel_summary,
+        synthetic_panel_size=(
+            research_intake.intended_synthetic_panel_size if research_intake is not None else None
+        ),
+        questionnaire_instrument_summary=questionnaire_instrument_summary,
+        nonresponse_weighting_summary=nonresponse_weighting_summary,
+        limitations_texts=list(report.limitations),
+        provenance_texts=[
+            f"Model {report.provenance.model_id}",
+            f"Provider {report.provenance.provider}",
+            f"Protocol {report.provenance.protocol_version}",
+            f"Blueprint hash {report.provenance.blueprint_hash}",
+            f"Manifest hash {report.provenance.manifest_hash}",
+        ],
+        fieldwork_handoff_texts=list(report.fieldwork_handoff),
         attrition=AttritionEvidence(
             labels=["succeeded", *sorted(report.failures.classifications.keys())],
             counts={
@@ -774,6 +1022,12 @@ def build_quality_input(report: ReportModel, artifacts: ReportArtifacts) -> Repo
         analysis_plan_summary=analysis_plan_summary,
         qualitative_coding_summary=qualitative_coding_summary,
         standards_alignment_texts=standards_alignment_texts,
+        research_basis_alignment_texts=[
+            *research_basis_alignment_texts,
+            *list(report.fieldwork_handoff),
+            *(report.methodology.quality_controls if report.methodology is not None else []),
+            report.methodology.approach if report.methodology is not None else "",
+        ],
         benchmark_wording_texts=benchmark_wording_texts,
         typed_answer_issues=_derive_typed_answer_issues(report),
     )
@@ -784,23 +1038,25 @@ def _derive_report_depth(report: ReportModel, artifacts: ReportArtifacts) -> Rep
     plain_text = re.sub(r"<[^>]+>", " ", html_text)
     word_count = len(re.findall(r"[A-Za-z0-9']+", plain_text))
     table_count = len(re.findall(r"<table\b", html_text, flags=re.IGNORECASE))
-    chart_count = len(artifacts.chart_paths) + len(report.analytics.population_charts)
+    chart_count = len(artifacts.chart_paths)
     segment_cut_count = sum(len(question.segment_cuts) for question in report.questions)
-    qualitative_theme_count = sum(
-        len(question.themes)
-        + sum(len(segment.themes) for segment in question.segment_cuts)
-        for question in report.questions
+    unique_theme_labels: set[tuple[str, str]] = set()
+    unique_quote_ids: set[str] = set()
+    for question in report.questions:
+        for quote in question.quote_evidence:
+            unique_quote_ids.add(quote.quote_id)
+        for theme in question.themes:
+            unique_theme_labels.add((question.question_id, theme.label.casefold()))
+            unique_quote_ids.update(theme.supporting_quote_ids)
+        for segment in question.segment_cuts:
+            for theme in segment.themes:
+                unique_theme_labels.add((question.question_id, theme.label.casefold()))
+                unique_quote_ids.update(theme.supporting_quote_ids)
+    qualitative_theme_count = len(unique_theme_labels)
+    traceable_quote_count = min(
+        len(unique_quote_ids),
+        MAX_TRACEABLE_QUOTE_DEPTH_CREDIT_PER_BLOCK,
     )
-    traceable_quote_count = sum(
-        len(theme.supporting_quote_ids)
-        for question in report.questions
-        for theme in question.themes
-    ) + sum(
-        len(theme.supporting_quote_ids)
-        for question in report.questions
-        for segment in question.segment_cuts
-        for theme in segment.themes
-    ) + sum(len(question.quote_evidence) for question in report.questions)
     return ReportDepthEvidence(
         pdf_pages=_pdf_page_count(artifacts.pdf_path),
         word_count=word_count,
@@ -905,6 +1161,11 @@ def _derive_sections_present(report: ReportModel) -> list[str]:
 def _contains_non_inferential_warning(text: str) -> bool:
     lowered = text.casefold()
     return "non-inferential" in lowered or "do not infer prevalence" in lowered
+
+
+def _has_disclosure_markers(text: str, markers: tuple[str, ...]) -> bool:
+    lowered = " ".join(text.split()).casefold()
+    return bool(lowered) and any(marker in lowered for marker in markers)
 
 
 def _detect_rendered_text_artifacts(

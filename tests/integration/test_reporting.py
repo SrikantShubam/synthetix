@@ -11,6 +11,7 @@ from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 
 from synthetix.reporting.models import (
+    AnalyticsChart,
     ChartDecision,
     DenominatorSummary,
     Distribution,
@@ -20,6 +21,8 @@ from synthetix.reporting.models import (
     ObjectiveCoverage,
     ProvenanceSummary,
     QuestionReport,
+    QuoteEvidence,
+    ReportAnalytics,
     ReportModel,
     SegmentComposition,
     SegmentCompositionEntry,
@@ -411,6 +414,83 @@ def test_report_pipeline_renders_executive_and_appendix_sections(
     assert "report.html" in checksums
 
 
+def test_report_pipeline_renders_population_and_segment_analytics_figures(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    _install_fake_weasyprint(monkeypatch)
+    report = _rich_report().model_copy(
+        update={
+            "analytics": ReportAnalytics(
+                population_charts=[
+                    AnalyticsChart(
+                        chart_id="population:region",
+                        title="Region composition",
+                        chart_family="population_segment",
+                        visual_type="donut",
+                        labels=["urban", "rural"],
+                        values=[2, 2],
+                        full_labels=["urban", "rural"],
+                        denominator=4,
+                    )
+                ],
+                segment_comparison_charts=[
+                    AnalyticsChart(
+                        chart_id="segment:q1:region",
+                        title="q1 by region",
+                        chart_family="segment_comparison",
+                        visual_type="heatmap",
+                        labels=["Yes", "Maybe", "No"],
+                        values=[2, 0, 0, 0, 1, 1],
+                        full_labels=["Yes", "Maybe", "No"],
+                        row_labels=["region: urban", "region: rural"],
+                        column_labels=["Yes", "Maybe", "No"],
+                        matrix=[[2, 0, 0], [0, 1, 1]],
+                        denominator=4,
+                    )
+                ],
+            )
+        }
+    )
+
+    artifacts = render_report(report, tmp_path)
+    html = artifacts.html_path.read_text(encoding="utf-8")
+
+    assert len(artifacts.chart_paths) == 3
+    assert (tmp_path / "figure-02-population-region.png").exists()
+    assert (tmp_path / "figure-03-segment-q1-region.png").exists()
+    assert "Analytics figures" in html
+    assert "Region composition" in html
+    assert "q1 by region" in html
+
+
+def test_report_pipeline_removes_stale_generated_figures(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    _install_fake_weasyprint(monkeypatch)
+    stale_figure = tmp_path / "figure-99-stale.png"
+    stale_figure.write_bytes(b"stale")
+    keep_file = tmp_path / "manual-note.txt"
+    keep_file.write_text("keep", encoding="utf-8")
+
+    artifacts = render_report(_rich_report(), tmp_path)
+
+    assert artifacts.chart_paths
+    assert not stale_figure.exists()
+    assert keep_file.exists()
+
+
+def test_chart_file_path_decodes_file_uris_with_spaces(tmp_path: Path) -> None:
+    chart_dir = tmp_path / "path with spaces"
+    chart_dir.mkdir()
+    chart_path = chart_dir / "figure 1.png"
+    chart_path.write_bytes(b"png")
+
+    resolved = renderer._chart_file_path(chart_path.resolve().as_uri())
+
+    assert resolved == chart_path.resolve()
+    assert resolved.exists()
+
+
 def test_report_pipeline_uses_theme_tables_not_raw_open_text_charts(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
@@ -497,6 +577,37 @@ def test_report_pipeline_renders_planned_vs_delivered_and_quote_evidence(
     assert "Use this evidence to inform" in html
     assert "q2:p1" in html
     assert "Price sensitivity and value concern" in html
+
+
+def test_report_pipeline_caps_quote_evidence_appendix(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    _install_fake_weasyprint(monkeypatch)
+    report = _rich_report()
+    questions = list(report.questions)
+    q2 = questions[1].model_copy(
+        update={
+            "quote_evidence": [
+                QuoteEvidence(
+                    quote_id=f"q2:p{index}",
+                    persona_id=f"p{index}",
+                    text=f"Long synthetic quote evidence row {index}.",
+                    attributes={"region": "urban"},
+                )
+                for index in range(1, 31)
+            ]
+        }
+    )
+    questions[1] = q2
+    report = report.model_copy(update={"questions": questions})
+
+    artifacts = render_report(report, tmp_path)
+    html = artifacts.html_path.read_text(encoding="utf-8")
+
+    assert "q2:p1" in html
+    assert "q2:p20" in html
+    assert "q2:p21" not in html
+    assert "10 additional quote rows omitted" in html
 
 
 def test_report_pipeline_wraps_long_chart_labels_for_choice_questions(

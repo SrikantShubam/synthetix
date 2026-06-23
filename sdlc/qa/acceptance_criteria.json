@@ -119,6 +119,26 @@
       "id": "A024",
       "source": "docs/specs/11-report-chart-quality-recovery.md",
       "text": "Backend chart generation chooses explicit visual types or suppression paths by question semantics; open-text questions use evidence panels or tables instead of raw charts."
+    },
+    {
+      "id": "A025",
+      "source": "docs/specs/12-research-basis-professional-report-recovery.md",
+      "text": "Professional report quality fails unless the run discloses alignment with the digital-persona research basis, including distributional evaluation, segment/equity checks, multivariate-structure limits, context/retrieval limits, and human-validation handoff."
+    },
+    {
+      "id": "A026",
+      "source": "docs/specs/12-research-basis-professional-report-recovery.md",
+      "text": "Professional golden-path fixtures fail validation when intended synthetic panel size is a toy panel below the configured professional minimum; novice and bad-input fixtures may remain small but cannot pass professional-report quality gates."
+    },
+    {
+      "id": "A027",
+      "source": "docs/specs/12-research-basis-professional-report-recovery.md, docs/protocols/research-design-standards-alignment.md",
+      "text": "Professional standards-aligned disclosure gates check substantive sample/source, synthetic panel, questionnaire/instrument, base-size/suppression, nonresponse or weighting, analysis, qualitative coding, limitation, provenance, and fieldwork handoff content rather than generic standards references."
+    },
+    {
+      "id": "A028",
+      "source": "docs/specs/12-research-basis-professional-report-recovery.md",
+      "text": "Professional chart decisions expose rendered visual type or replacement type, suppress tiny-base visuals, and fail when the chart contract is not auditable."
     }
   ]
 }

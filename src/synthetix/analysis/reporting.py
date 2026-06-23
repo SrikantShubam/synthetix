@@ -28,6 +28,8 @@ from synthetix.reporting.models import (
 
 MAX_QUOTES = 5
 MIN_SEGMENT_BASE = 2
+MIN_CHART_BASE = 2
+PROFESSIONAL_MIN_CHART_BASE = 30
 _THEME_STOPWORDS = {
     "a",
     "an",
@@ -248,6 +250,45 @@ def _echarts_likert_option(
                 "data": [value],
             }
             for index, (label, value) in enumerate(zip(labels, values, strict=False))
+        ],
+    }
+
+
+def _echarts_heatmap_option(
+    *,
+    title: str,
+    row_labels: list[str],
+    column_labels: list[str],
+    matrix: list[list[int]],
+) -> dict[str, Any]:
+    values = [
+        [column_index, row_index, value]
+        for row_index, row in enumerate(matrix)
+        for column_index, value in enumerate(row)
+    ]
+    max_value = max((value for row in matrix for value in row), default=0)
+    return {
+        "animation": False,
+        "title": {"text": title, "left": "left"},
+        "tooltip": {"position": "top"},
+        "grid": {"left": 120, "right": 24, "top": 64, "bottom": 72, "containLabel": True},
+        "xAxis": {"type": "category", "data": column_labels, "splitArea": {"show": True}},
+        "yAxis": {"type": "category", "data": row_labels, "splitArea": {"show": True}},
+        "visualMap": {
+            "min": 0,
+            "max": max_value,
+            "calculable": False,
+            "orient": "horizontal",
+            "left": "center",
+            "bottom": 0,
+        },
+        "series": [
+            {
+                "name": "Segment response count",
+                "type": "heatmap",
+                "data": values,
+                "label": {"show": True},
+            }
         ],
     }
 
@@ -555,19 +596,20 @@ def _build_population_charts(segment_composition: list[SegmentComposition]) -> l
         values = [segment.count for segment in composition.segments]
         full_labels = [segment.value for segment in composition.segments]
         title = f"{composition.attribute.replace('_', ' ').title()} composition"
+        use_donut = 3 <= len(values) <= 5 and sum(values) > 0
         charts.append(
             AnalyticsChart(
                 chart_id=f"population:{composition.attribute}",
                 title=title,
                 chart_family="population_segment",
-                visual_type="donut" if 2 <= len(values) <= 5 and sum(values) > 0 else "horizontal_bar",
+                visual_type="donut" if use_donut else "horizontal_bar",
                 labels=labels,
                 values=values,
                 full_labels=full_labels,
                 denominator=sum(values),
                 option=(
                     _echarts_donut_option(title=title, labels=full_labels, values=values)
-                    if 2 <= len(values) <= 5 and sum(values) > 0
+                    if use_donut
                     else _echarts_bar_option(
                         title=title,
                         labels=labels,
@@ -578,6 +620,54 @@ def _build_population_charts(segment_composition: list[SegmentComposition]) -> l
                 ),
             )
         )
+    return charts
+
+
+def _build_segment_comparison_charts(question_reports: list[QuestionReport]) -> list[AnalyticsChart]:
+    charts: list[AnalyticsChart] = []
+    for report in question_reports:
+        if report.chart_decision is not None and report.chart_decision.status != "rendered":
+            continue
+        if report.question_type not in {"choice", "likert"} or not report.distribution.labels:
+            continue
+        by_attribute: dict[str, list[SegmentCut]] = defaultdict(list)
+        for cut in report.segment_cuts:
+            if cut.suppressed or not cut.distribution.labels:
+                continue
+            by_attribute[cut.attribute].append(cut)
+        for attribute, cuts in sorted(by_attribute.items()):
+            row_labels: list[str] = []
+            matrix: list[list[int]] = []
+            for cut in cuts:
+                values_by_label = dict(zip(cut.distribution.labels, cut.distribution.values, strict=False))
+                matrix.append([int(values_by_label.get(label, 0)) for label in report.distribution.labels])
+                row_labels.append(f"{attribute}: {cut.value}")
+            if not row_labels:
+                continue
+            column_labels = list(report.distribution.labels)
+            values = [value for row in matrix for value in row]
+            title = f"{report.question_id} by {attribute.replace('_', ' ')}"
+            charts.append(
+                AnalyticsChart(
+                    chart_id=f"segment:{report.question_id}:{attribute}",
+                    title=title,
+                    chart_family="segment_comparison",
+                    visual_type="heatmap",
+                    labels=[_wrap_chart_label(label) for label in column_labels],
+                    values=values,
+                    full_labels=column_labels,
+                    row_labels=row_labels,
+                    column_labels=column_labels,
+                    matrix=matrix,
+                    denominator=sum(sum(row) for row in matrix),
+                    option=_echarts_heatmap_option(
+                        title=title,
+                        row_labels=row_labels,
+                        column_labels=column_labels,
+                        matrix=matrix,
+                    ),
+                )
+            )
     return charts
 
 
@@ -638,29 +728,70 @@ def _build_question_chart(report: QuestionReport) -> AnalyticsChart | None:
     return None
 
 
-def _chart_decision(report: QuestionReport) -> ChartDecision:
-    if report.denominators.valid_responses < MIN_SEGMENT_BASE:
+def _chart_decision(
+    report: QuestionReport,
+    chart: AnalyticsChart | None,
+    *,
+    min_chart_base: int = MIN_CHART_BASE,
+) -> ChartDecision:
+    if report.denominators.valid_responses < min_chart_base:
         return ChartDecision(
             question_id=report.question_id,
             status="suppressed",
-            reason="Question base is too small for a stable chart.",
+            reason=(
+                "Question base is too small for a stable chart: "
+                f"valid responses={report.denominators.valid_responses} is below the minimum base of {min_chart_base}."
+            ),
         )
-    if report.question_type in {"choice", "likert"} and report.distribution.labels:
+    if report.question_role == "diagnostic" and any(cut.suppressed for cut in report.segment_cuts):
+        return ChartDecision(
+            question_id=report.question_id,
+            status="replaced_with_table",
+            reason=(
+                "This diagnostic reporting decision has at least one suppressed segment cut; "
+                "a table preserves the base-size context better than a standalone chart."
+            ),
+            replacement_type="table",
+        )
+    prompt = report.prompt.casefold()
+    if report.question_role == "diagnostic" and any(
+        marker in prompt
+        for marker in (
+            "regional pattern",
+            "country-group",
+            "minimum-base",
+            "unstable",
+            "reported",
+        )
+    ):
+        return ChartDecision(
+            question_id=report.question_id,
+            status="replaced_with_table",
+            reason=(
+                "This diagnostic item is a reporting decision about unstable segment cuts; "
+                "a table preserves the base-size context better than a standalone chart."
+            ),
+            replacement_type="table",
+        )
+    if chart is not None and report.question_type in {"choice", "likert"} and report.distribution.labels:
         return ChartDecision(
             question_id=report.question_id,
             status="rendered",
             reason="Closed-ended distribution has a stable base and chart-safe categorical labels.",
+            visual_type=chart.visual_type,
         )
     if report.question_type == "open_text" and report.themes:
         return ChartDecision(
             question_id=report.question_id,
             status="replaced_with_evidence_panel",
             reason="Open-text evidence is better shown through coded themes and quotes than a raw chart.",
+            replacement_type="evidence_panel",
         )
     return ChartDecision(
         question_id=report.question_id,
         status="replaced_with_table",
         reason="No chart-safe series was available for this question.",
+        replacement_type="table",
     )
 
 
@@ -691,11 +822,6 @@ def _build_question_report(
             ),
             quote_evidence=quote_evidence,
             segment_cuts=_build_segment_cuts(question, succeeded_respondents, population_attributes),
-            chart_decision=ChartDecision(
-                question_id=question.id,
-                status="rendered",
-                reason="Closed-ended distribution has a stable base and chart-safe categorical labels.",
-            ),
         )
 
     if question.type == "likert":
@@ -716,11 +842,6 @@ def _build_question_report(
             ),
             quote_evidence=quote_evidence,
             segment_cuts=_build_segment_cuts(question, succeeded_respondents, population_attributes),
-            chart_decision=ChartDecision(
-                question_id=question.id,
-                status="rendered",
-                reason="Closed-ended distribution has a stable base and chart-safe categorical labels.",
-            ),
         )
 
     quote_evidence, themes = _build_open_text_evidence(question, answered_respondents)
@@ -741,20 +862,14 @@ def _build_question_report(
         quote_evidence=quote_evidence,
         themes=themes,
         segment_cuts=_build_segment_cuts(question, succeeded_respondents, population_attributes),
-        chart_decision=ChartDecision(
-            question_id=question.id,
-            status="replaced_with_evidence_panel" if themes else "replaced_with_table",
-            reason=(
-                "Open-text evidence is better shown through coded themes and quotes than a raw chart."
-                if themes
-                else "No chart-safe qualitative summary was available."
-            ),
-        ),
     )
 
 
 def _build_executive_findings(question_reports: list[QuestionReport]) -> list[ExecutiveFinding]:
     findings: list[ExecutiveFinding] = []
+    synthesis = _build_cross_question_synthesis(question_reports)
+    if synthesis is not None:
+        findings.append(synthesis)
     for question in question_reports:
         if question.question_type in {"choice", "likert"} and question.distribution.labels:
             pairs = list(zip(question.distribution.labels, question.distribution.values))
@@ -795,6 +910,65 @@ def _build_executive_findings(question_reports: list[QuestionReport]) -> list[Ex
     return findings[:5]
 
 
+def _build_cross_question_synthesis(question_reports: list[QuestionReport]) -> ExecutiveFinding | None:
+    closed_summary: tuple[str, str, int, int, list[str]] | None = None
+    qualitative_summary: tuple[str, str, int, int, list[str]] | None = None
+
+    for question in question_reports:
+        if (
+            closed_summary is None
+            and question.question_type in {"choice", "likert"}
+            and question.distribution.labels
+            and question.denominators.valid_responses > 0
+        ):
+            pairs = list(zip(question.distribution.labels, question.distribution.values, strict=False))
+            top_label, top_count = max(pairs, key=lambda pair: (pair[1], pair[0]))
+            if top_count > 0:
+                evidence_quote_ids = [
+                    quote.quote_id
+                    for quote in question.quote_evidence
+                    if _normalized_text(quote.text) == _normalized_text(top_label)
+                ][:MAX_QUOTES]
+                closed_summary = (
+                    question.question_id,
+                    top_label,
+                    top_count,
+                    question.denominators.valid_responses,
+                    evidence_quote_ids,
+                )
+        if qualitative_summary is None and question.question_type == "open_text" and question.themes:
+            theme = question.themes[0]
+            qualitative_summary = (
+                question.question_id,
+                theme.label,
+                theme.count,
+                question.denominators.valid_responses,
+                list(theme.supporting_quote_ids)[:MAX_QUOTES],
+            )
+        if closed_summary is not None and qualitative_summary is not None:
+            break
+
+    if closed_summary is None or qualitative_summary is None:
+        return None
+
+    closed_question_id, top_label, top_count, closed_base, closed_quotes = closed_summary
+    qualitative_question_id, theme_label, theme_count, theme_base, theme_quotes = qualitative_summary
+    evidence_quote_ids = [*closed_quotes, *theme_quotes][:MAX_QUOTES]
+    return ExecutiveFinding(
+        finding_id="cross-question-synthesis",
+        title="Cross-question synthesis",
+        summary=(
+            "Across the dry-run questions, the leading closed-ended signal was "
+            f"'{top_label}' on {closed_question_id} ({top_count}/{closed_base}), while the leading "
+            f"coded rationale was '{theme_label}' on {qualitative_question_id} "
+            f"({theme_count}/{theme_base}). Treat this as a hypothesis for human fieldwork, not a "
+            "representative estimate."
+        ),
+        question_id=closed_question_id,
+        evidence_quote_ids=evidence_quote_ids,
+    )
+
+
 def _build_objective_coverage(
     blueprint: SimulationBlueprint,
     question_reports: list[QuestionReport],
@@ -802,32 +976,98 @@ def _build_objective_coverage(
     research_design = blueprint.research_design
     if research_design is None:
         return []
-    primary_questions = [
-        report.question_id
-        for report in question_reports
-        if report.question_role in {"primary_outcome", "driver", "diagnostic", "qualitative_probe"}
-    ]
-    if not primary_questions:
-        primary_questions = [report.question_id for report in question_reports]
     coverage: list[ObjectiveCoverage] = []
     for index, objective in enumerate(research_design.research_objectives):
         decision_question = (
             research_design.decision_questions[index]
             if index < len(research_design.decision_questions)
+            else research_design.decision_questions[-1]
+            if research_design.decision_questions
             else None
+        )
+        covered_question_ids = _questions_for_objective(
+            objective=objective,
+            decision_question=decision_question,
+            question_reports=question_reports,
         )
         coverage.append(
             ObjectiveCoverage(
                 objective=objective,
                 decision_question=decision_question,
-                covered_question_ids=primary_questions,
-                status="covered" if primary_questions else "gap",
+                covered_question_ids=covered_question_ids,
+                status="covered" if covered_question_ids else "gap",
                 notes=(
-                    "Coverage is derived from planned primary, driver, diagnostic, and qualitative questions."
+                    "Coverage is derived from objective-specific question role, prompt, and decision-question relevance."
                 ),
             )
         )
     return coverage
+
+
+def _questions_for_objective(
+    *,
+    objective: str,
+    decision_question: str | None,
+    question_reports: list[QuestionReport],
+) -> list[str]:
+    objective_text = f"{objective} {decision_question or ''}"
+    objective_tokens = _semantic_tokens(objective_text)
+    role_hints = _objective_role_hints(objective_text)
+    needs_suppression_evidence = any(
+        marker in objective_text.casefold()
+        for marker in ("segment", "suppression", "suppress", "base", "regional", "subgroup")
+    )
+    scored: list[tuple[int, str]] = []
+
+    for report in question_reports:
+        score = 0
+        if report.question_role in role_hints:
+            score += 8
+        if needs_suppression_evidence and report.question_role == "diagnostic":
+            prompt = report.prompt.casefold()
+            if any(
+                marker in prompt
+                for marker in ("unstable", "base", "bases", "regional", "reported", "report", "country-group", "subgroup")
+            ):
+                score += 6
+        if report.question_type == "open_text" and "qualitative_probe" in role_hints:
+            score += 2
+        if report.question_type in {"choice", "likert"} and role_hints & {"primary_outcome", "driver"}:
+            score += 1
+        score += len(objective_tokens & _semantic_tokens(report.prompt))
+        if score > 0:
+            scored.append((score, report.question_id))
+
+    if not scored:
+        return []
+    best_score = max(score for score, _question_id in scored)
+    return [question_id for score, question_id in scored if score == best_score]
+
+
+def _semantic_tokens(text: str) -> set[str]:
+    tokens = {
+        token.strip(".,;:!?()[]{}\"'").casefold()
+        for token in text.replace("/", " ").replace("-", " ").split()
+    }
+    return {
+        token
+        for token in tokens
+        if len(token) >= 4 and token not in _THEME_STOPWORDS
+    }
+
+
+def _objective_role_hints(text: str) -> set[str]:
+    lowered = text.casefold()
+    hints: set[str] = set()
+    if any(marker in lowered for marker in ("theme", "barrier", "objection", "why", "rationale", "reason")):
+        hints.add("qualitative_probe")
+    if any(marker in lowered for marker in ("fit", "adopt", "proceed", "accept", "preference", "intent")):
+        hints.add("primary_outcome")
+    if any(marker in lowered for marker in ("driver", "factor", "influence", "importance")):
+        hints.add("driver")
+    if any(marker in lowered for marker in ("segment", "cut", "suppression", "base", "diagnostic")):
+        hints.add("diagnostic")
+    return hints or {"primary_outcome", "driver", "diagnostic", "qualitative_probe"}
 
 
 def build_report(
@@ -866,19 +1106,29 @@ def build_report(
         succeeded_respondents,
         blueprint.population.attributes,
     )
-    question_reports = [
-        report.model_copy(
-            update={
-                "chart_decision": report.chart_decision or _chart_decision(report),
-                "chart": (
-                    _build_question_chart(report)
-                    if (report.chart_decision or _chart_decision(report)).status == "rendered"
-                    else None
-                ),
-            }
+    min_chart_base = (
+        PROFESSIONAL_MIN_CHART_BASE
+        if blueprint.research_design is not None
+        and blueprint.research_design.requires_professional_quality_gate()
+        else MIN_CHART_BASE
+    )
+    updated_question_reports: list[QuestionReport] = []
+    for question_report in question_reports:
+        chart = _build_question_chart(question_report)
+        chart_decision = _chart_decision(
+            question_report,
+            chart,
+            min_chart_base=min_chart_base,
         )
-        for report in question_reports
-    ]
+        updated_question_reports.append(
+            question_report.model_copy(
+                update={
+                    "chart": chart if chart_decision.status == "rendered" else None,
+                    "chart_decision": chart_decision,
+                }
+            )
+        )
+    question_reports = updated_question_reports
     return ReportModel(
         run_id=result.run_id,
         title=blueprint.title,
@@ -893,6 +1143,7 @@ def build_report(
         segment_composition=segment_composition,
         analytics=ReportAnalytics(
             population_charts=_build_population_charts(segment_composition),
+            segment_comparison_charts=_build_segment_comparison_charts(question_reports),
         ),
         research_design=blueprint.research_design,
         research_intake=blueprint.research_intake,

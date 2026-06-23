@@ -92,6 +92,11 @@
       "id": "C018",
       "source": "docs/specs/11-report-chart-quality-recovery.md",
       "text": "Professional proof artifacts must use the real report renderer path and may not substitute plaintext fallback PDFs. Report quality scoring must cap failed hard-gate results below threshold, and backend chart generation must choose an explicit visual type or a suppression/evidence-panel path instead of defaulting every question to the same chart form."
+    },
+    {
+      "id": "C019",
+      "source": "docs/specs/12-research-basis-professional-report-recovery.md, research/golden_paper_contract.json",
+      "text": "Professional golden-path proof must operationalize the public digital-persona survey research basis: distributional evaluation, segment/equity checks, multivariate-structure limitations, retrieval/context limits, and human-validation handoff. Presence-only report gates, toy professional panels, generic standards text, and unauditable chart decisions cannot pass professional quality."
     }
   ],
   "non_negotiable": [
@@ -108,7 +113,8 @@
     "C015",
     "C016",
     "C017",
-    "C018"
+    "C018",
+    "C019"
   ],
   "retired": []
 }
@@ -143,6 +149,7 @@ Synthetix is a self-hosted synthetic scenario-exploration and survey simulation 
 - `09-research-design-study-plan`: active and now executed through an intake-first vertical slice. `ResearchIntake` precedes `ResearchDesign` for document/questionnaire ingestion, professional PDF intake enforces explicit OCR confidence rules, and reports now disclose intake scale, chart decisions, and fieldwork handoff.
 - `10-golden-path-intake-reset`: active; golden-path proof artifacts now use real renderer paths and fixture-backed intake proof instead of placeholder proof outputs.
 - `11-report-chart-quality-recovery`: active; professional report quality now requires honest renderer evidence, hard-gate-capped scores, and explicit chart-type decisions instead of a bar-only fallback.
+- `12-research-basis-professional-report-recovery`: active; professional proof must now demonstrate alignment with the actual digital-persona survey research basis, reject toy professional panels, enforce substantive standards-aligned disclosure, and expose auditable chart decisions.
 
 ## Current Evaluation State
 
@@ -158,11 +165,12 @@ Synthetix is a self-hosted synthetic scenario-exploration and survey simulation 
 2. Continue rich reporting only after the intake-first contract is used by the shipped examples and objective-coverage/report-depth outputs remain strong under those fixtures.
 3. Keep production or structured PDF proof honest and prevent fallback plaintext artifacts from passing as professional output.
 4. Expand chart selection beyond bar-only defaults and preserve evidence-panel suppression for qualitative questions.
-5. Author and review locked holdout target JSON fixtures with source PDF hash validation.
-6. Run holdout actual-vs-predicted only after the target fixtures are locked.
-7. Keep all benchmark and report changes inside the scientific boundary.
-8. Harden the SDLC governor by running live Promptfoo gates once provider credentials are configured.
-9. Use Gryph evidence during future Codex/Claude Code sessions to generate dynamic context and review agent actions.
+5. Enforce digital-persona research-basis alignment before treating selected metric pass rate or professional report output as product-quality evidence.
+6. Author and review locked holdout target JSON fixtures with source PDF hash validation.
+7. Run holdout actual-vs-predicted only after the target fixtures are locked.
+8. Keep all benchmark and report changes inside the scientific boundary.
+9. Harden the SDLC governor by running live Promptfoo gates once provider credentials are configured.
+10. Use Gryph evidence during future Codex/Claude Code sessions to generate dynamic context and review agent actions.
 
 ## Non-Goals
 

@@ -9,7 +9,7 @@ from datetime import date, datetime
 from io import BytesIO
 from pathlib import Path
 from typing import Any, cast
-from urllib.parse import urlparse
+from urllib.parse import unquote, urlparse
 
 import matplotlib
 
@@ -219,6 +219,19 @@ REPORT_TEMPLATE = """
         {% endfor %}
         </tbody>
       </table>
+      {% if view.analytics_charts %}
+      <div class="analytics-figure-grid" id="analytics-figures">
+        <h3>Analytics figures</h3>
+        {% for chart in view.analytics_charts %}
+        {% if chart.chart_path %}
+        <figure class="chart-figure">
+          <img src="{{ chart.chart_path }}" alt="{{ chart.title }}">
+          <figcaption>Figure {{ chart.figure_number }}. {{ chart.title }} (n = {{ chart.denominator }}).</figcaption>
+        </figure>
+        {% endif %}
+        {% endfor %}
+      </div>
+      {% endif %}
     </section>
 
 	    <section id="question-distributions" class="report-section">
@@ -457,6 +470,9 @@ REPORT_TEMPLATE = """
 	      <p>This appendix preserves the synthetic response evidence used for theme coding and finding support. Quote IDs are deterministic and tie each quote back to the question and synthetic persona.</p>
 	      {% for block in view.quote_evidence_blocks %}
 	      <h3>{{ block.question_id }}</h3>
+	      {% if block.omitted_count %}
+	      <p>{{ block.omitted_count }} additional quote rows omitted from this rendered appendix; aggregate theme counts remain in the report JSON.</p>
+	      {% endif %}
 	      <table class="report-table">
 	        <caption>Quote evidence for {{ block.question_id }}.</caption>
 	        <thead>
@@ -484,6 +500,7 @@ REPORT_TEMPLATE = """
 
 PACKAGE_DIR = Path(__file__).resolve().parents[1]
 REPORT_STYLESHEET = PACKAGE_DIR / "web" / "static" / "reporting.css"
+MAX_QUOTE_EVIDENCE_APPENDIX_ROWS = 20
 
 
 @dataclass(frozen=True)
@@ -790,9 +807,13 @@ def _build_questions(payload: dict[str, Any]) -> list[dict[str, Any]]:
         if not table_labels and chart_labels and chart_values:
             table_labels = chart_full_labels or chart_labels
             table_values = chart_values
+        chart_decision_status = _coerce_text(chart_decision.get("status"))
         rendered_chart_labels = chart_labels
         rendered_chart_values = chart_values
-        if not chart and _coerce_text(question.get("question_type")) in {"choice", "likert"}:
+        if chart_decision_status and chart_decision_status != "rendered":
+            rendered_chart_labels = []
+            rendered_chart_values = []
+        elif not chart and _coerce_text(question.get("question_type")) in {"choice", "likert"}:
             rendered_chart_labels = labels
             rendered_chart_values = values
         elif not chart:
@@ -818,7 +839,7 @@ def _build_questions(payload: dict[str, Any]) -> list[dict[str, Any]]:
                 "chart_values": rendered_chart_values,
                 "chart_family": _coerce_text(chart.get("chart_family")),
                 "chart_visual_type": _coerce_text(chart.get("visual_type"), "bar"),
-                "chart_decision_status": _coerce_text(chart_decision.get("status")),
+                "chart_decision_status": chart_decision_status,
                 "chart_decision_reason": _coerce_text(chart_decision.get("reason")),
                 "rows": rows,
                 "quotes": [_coerce_text(quote) for quote in _coerce_list(question.get("quotes"))],
@@ -834,7 +855,7 @@ def _build_questions(payload: dict[str, Any]) -> list[dict[str, Any]]:
                     and _coerce_text(_coerce_mapping(segment).get("suppression_reason"))
                 ],
                 "themes": _coerce_list(question.get("themes")),
-                "figure_number": index,
+                "figure_number": 0,
             }
         )
     return views
@@ -978,6 +999,44 @@ def _build_segment_comparisons(questions: list[dict[str, Any]], start_table_numb
     return comparisons
 
 
+def _build_analytics_charts(payload: dict[str, Any], start_figure_number: int) -> list[dict[str, Any]]:
+    analytics = _coerce_mapping(payload.get("analytics"))
+    charts: list[dict[str, Any]] = []
+    figure_number = start_figure_number
+    for group in ("population_charts", "segment_comparison_charts"):
+        for item in _coerce_list(analytics.get(group)):
+            chart = _coerce_mapping(item)
+            chart_id = _coerce_text(chart.get("chart_id"), f"analytics:{figure_number}")
+            charts.append(
+                {
+                    "chart_id": chart_id,
+                    "title": _coerce_text(chart.get("title"), "Analytics figure"),
+                    "chart_family": _coerce_text(chart.get("chart_family")),
+                    "chart_visual_type": _coerce_text(chart.get("visual_type"), "bar"),
+                    "labels": [_coerce_text(label) for label in _coerce_list(chart.get("labels"))],
+                    "values": [_coerce_int(value) for value in _coerce_list(chart.get("values"))],
+                    "full_labels": [
+                        _coerce_text(label) for label in _coerce_list(chart.get("full_labels"))
+                    ],
+                    "row_labels": [
+                        _coerce_text(label) for label in _coerce_list(chart.get("row_labels"))
+                    ],
+                    "column_labels": [
+                        _coerce_text(label) for label in _coerce_list(chart.get("column_labels"))
+                    ],
+                    "matrix": [
+                        [_coerce_int(value) for value in _coerce_list(row)]
+                        for row in _coerce_list(chart.get("matrix"))
+                    ],
+                    "denominator": _coerce_int(chart.get("denominator")),
+                    "figure_number": figure_number,
+                    "chart_path": "",
+                }
+            )
+            figure_number += 1
+    return charts
+
+
 def _build_qualitative_themes(payload: dict[str, Any]) -> list[dict[str, Any]]:
     views = []
     for question in _coerce_list(payload.get("questions")):
@@ -1045,10 +1104,12 @@ def _build_quote_evidence_blocks(payload: dict[str, Any]) -> list[dict[str, Any]
                 }
             )
         if quote_rows:
+            omitted_count = max(0, len(quote_rows) - MAX_QUOTE_EVIDENCE_APPENDIX_ROWS)
             blocks.append(
                 {
                     "question_id": _coerce_text(question_row.get("question_id")),
-                    "rows": quote_rows,
+                    "rows": quote_rows[:MAX_QUOTE_EVIDENCE_APPENDIX_ROWS],
+                    "omitted_count": omitted_count,
                 }
             )
     return blocks
@@ -1150,12 +1211,18 @@ def _build_report_view(payload: dict[str, Any]) -> dict[str, Any]:
     failures = _coerce_mapping(payload.get("failures"))
     population_summary, population_rows = _build_population_rows(payload)
     questions = _build_questions(payload)
+    next_figure_number = 1
+    for question in questions:
+        if question["chart_labels"]:
+            question["figure_number"] = next_figure_number
+            next_figure_number += 1
     next_table_number = 2
     for question in questions:
         question["table_number"] = next_table_number
         next_table_number += 1
     segment_comparisons = _build_segment_comparisons(questions, next_table_number)
     next_table_number += len(segment_comparisons)
+    analytics_charts = _build_analytics_charts(payload, next_figure_number)
     failure_table_number = next_table_number
     objective_coverage = _build_objective_coverage(payload)
     objective_coverage_table_number = failure_table_number + 1
@@ -1182,6 +1249,7 @@ def _build_report_view(payload: dict[str, Any]) -> dict[str, Any]:
         "population_summary": population_summary,
         "population_rows": population_rows,
         "population_table_number": 1,
+        "analytics_charts": analytics_charts,
 	        "questions": questions,
 	        "question_interpretations": _build_question_interpretations(payload, questions),
 	        "segment_comparisons": segment_comparisons,
@@ -1222,6 +1290,7 @@ def _build_report_view(payload: dict[str, Any]) -> dict[str, Any]:
             {"id": "research-intake", "label": "Research intake"},
             {"id": "report-contract", "label": "Report warnings and chart decisions"},
             {"id": "population-composition", "label": "Population composition"},
+            {"id": "analytics-figures", "label": "Analytics figures"},
 		            {"id": "question-distributions", "label": "Question distributions"},
 	            {"id": "question-interpretation", "label": "Question interpretation and implications"},
 	            {"id": "segment-comparisons", "label": "Segment comparisons"},
@@ -1348,6 +1417,111 @@ def _render_charts(questions: list[dict[str, Any]], output_dir: Path) -> list[Pa
     return files
 
 
+def _render_analytics_charts(charts: list[dict[str, Any]], output_dir: Path) -> list[Path]:
+    files: list[Path] = []
+    for chart in charts:
+        labels = [_coerce_text(label) for label in _coerce_list(chart.get("labels"))]
+        values = [_coerce_int(value) for value in _coerce_list(chart.get("values"))]
+        visual_type = _coerce_text(chart.get("chart_visual_type"), "bar")
+        path = output_dir / f"figure-{_coerce_int(chart.get('figure_number')):02d}-{_slugify(_coerce_text(chart.get('chart_id')))}.png"
+        figure, axis = plt.subplots(figsize=(8.4, 4.8), dpi=144)
+        figure.patch.set_facecolor("white")
+        axis.set_facecolor("white")
+
+        if visual_type == "heatmap":
+            row_labels = [
+                _wrap_tick_label(label, width=22)
+                for label in _coerce_list(chart.get("row_labels"))
+            ]
+            column_labels = [
+                _wrap_tick_label(label, width=14)
+                for label in _coerce_list(chart.get("column_labels"))
+            ]
+            matrix = [
+                [_coerce_int(value) for value in _coerce_list(row)]
+                for row in _coerce_list(chart.get("matrix"))
+            ]
+            if not matrix or not row_labels or not column_labels:
+                plt.close(figure)
+                chart["chart_path"] = ""
+                continue
+            image = axis.imshow(matrix, cmap="Blues", aspect="auto")
+            axis.set_xticks(range(len(column_labels)), labels=column_labels)
+            axis.set_yticks(range(len(row_labels)), labels=row_labels)
+            axis.tick_params(axis="x", labelrotation=0, labelsize=8, pad=8)
+            axis.tick_params(axis="y", labelsize=8)
+            for row_index, row in enumerate(matrix):
+                for column_index, value in enumerate(row):
+                    axis.text(
+                        column_index,
+                        row_index,
+                        str(value),
+                        ha="center",
+                        va="center",
+                        color="#102a43" if value == 0 else "white",
+                        fontsize=8,
+                    )
+            figure.colorbar(image, ax=axis, shrink=0.72, label="Synthetic responses")
+        elif visual_type == "donut":
+            wrapped_labels = [_wrap_tick_label(label) for label in labels]
+            total = sum(values) or 1
+            axis.pie(
+                values,
+                labels=wrapped_labels,
+                autopct=lambda pct: f"{pct:.0f}%\n({round(total * pct / 100):.0f})" if pct > 0 else "",
+                startangle=90,
+                counterclock=False,
+                wedgeprops={"width": 0.42, "edgecolor": "white"},
+                textprops={"fontsize": 8, "color": "#102a43"},
+            )
+            axis.text(0, 0, f"n = {total}", ha="center", va="center", fontsize=10, color="#102a43")
+            axis.set(aspect="equal")
+            axis.tick_params(left=False, bottom=False, labelleft=False, labelbottom=False)
+        elif visual_type == "horizontal_bar":
+            wrapped_labels = [_wrap_tick_label(label) for label in labels]
+            bars = axis.barh(wrapped_labels, values, color="#1f5f78", height=0.62)
+            axis.set_xlabel("Synthetic respondents", fontsize=9)
+            axis.xaxis.set_major_locator(MaxNLocator(integer=True))
+            axis.grid(axis="x", color="#d7dee3", linewidth=0.8)
+            for bar, value in zip(bars, values, strict=False):
+                axis.text(
+                    bar.get_width() + 0.03,
+                    bar.get_y() + bar.get_height() / 2,
+                    str(value),
+                    ha="left",
+                    va="center",
+                    fontsize=8,
+                    color="#102a43",
+                )
+        else:
+            wrapped_labels = [_wrap_tick_label(label) for label in labels]
+            bars = axis.bar(wrapped_labels, values, color="#1f5f78", width=0.62)
+            axis.set_ylabel("Synthetic respondents", fontsize=9)
+            axis.yaxis.set_major_locator(MaxNLocator(integer=True))
+            axis.grid(axis="y", color="#d7dee3", linewidth=0.8)
+            for bar, value in zip(bars, values, strict=False):
+                axis.text(
+                    bar.get_x() + bar.get_width() / 2,
+                    bar.get_height() + 0.03,
+                    str(value),
+                    ha="center",
+                    va="bottom",
+                    fontsize=8,
+                    color="#102a43",
+                )
+
+        axis.set_title(_coerce_text(chart.get("title"), "Analytics figure"), loc="left", fontsize=11, pad=12)
+        axis.set_axisbelow(True)
+        for spine in ("top", "right"):
+            axis.spines[spine].set_visible(False)
+        figure.tight_layout()
+        figure.savefig(path, metadata={"Software": "Synthetix"}, dpi=120)
+        plt.close(figure)
+        chart["chart_path"] = path.resolve().as_uri()
+        files.append(path)
+    return files
+
+
 def _render_html(view: dict[str, Any]) -> str:
     environment = Environment(autoescape=select_autoescape(["html", "xml"]))
     template = environment.from_string(REPORT_TEMPLATE)
@@ -1359,7 +1533,7 @@ def _chart_file_path(chart_uri: str) -> Path | None:
         return None
     parsed = urlparse(chart_uri)
     if parsed.scheme == "file":
-        return Path(parsed.path.lstrip("/"))
+        return Path(unquote(parsed.path.lstrip("/")))
     path = Path(chart_uri)
     return path if path.exists() else None
 
@@ -1489,6 +1663,14 @@ def _render_pdf_reportlab(report: ReportModel, view: dict[str, Any], pdf_path: P
             )
     if len(population_rows) > 1:
         story.append(_reportlab_table(population_rows, column_widths=[1.6 * inch, 2.2 * inch, 0.9 * inch, 0.9 * inch]))
+    for chart in view.get("analytics_charts", []):
+        if not isinstance(chart, Mapping):
+            continue
+        chart_path = _chart_file_path(str(chart.get("chart_path", "")))
+        if chart_path is not None and chart_path.exists():
+            story.append(Paragraph(str(chart.get("title", "Analytics figure")), styles["h2"]))
+            story.append(ReportImage(str(chart_path), width=6.0 * inch, height=3.45 * inch))
+            story.append(Spacer(1, 0.08 * inch))
     story.append(Spacer(1, 0.14 * inch))
 
     story.extend(
@@ -1673,6 +1855,7 @@ def _render_pdf(html: str, pdf_path: Path, base_url: str) -> None:
 
 def render_report(report: ReportModel, output_dir: Path) -> ReportArtifacts:
     output_dir.mkdir(parents=True, exist_ok=True)
+    _remove_stale_generated_artifacts(output_dir)
     payload = _report_payload(report)
     view = _build_report_view(payload)
     json_path = output_dir / "report.json"
@@ -1684,7 +1867,10 @@ def render_report(report: ReportModel, output_dir: Path) -> ReportArtifacts:
         json.dumps(payload, indent=2, sort_keys=True, default=_json_default),
         encoding="utf-8",
     )
-    chart_files = _render_charts(view["questions"], output_dir)
+    chart_files = [
+        *_render_charts(view["questions"], output_dir),
+        *_render_analytics_charts(view["analytics_charts"], output_dir),
+    ]
     html = _render_html(view)
     html_path.write_text(html, encoding="utf-8")
     render_mode = "weasyprint"
@@ -1705,3 +1891,13 @@ def render_report(report: ReportModel, output_dir: Path) -> ReportArtifacts:
         chart_paths=chart_files,
         render_mode=render_mode,
     )
+
+
+def _remove_stale_generated_artifacts(output_dir: Path) -> None:
+    for path in output_dir.glob("figure-*.png"):
+        if path.is_file():
+            path.unlink()
+    for name in ("report.json", "report.html", "report.pdf", "checksums.json"):
+        path = output_dir / name
+        if path.is_file():
+            path.unlink()

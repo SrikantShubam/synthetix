@@ -24,6 +24,7 @@ Read this first. Open larger SDLC files only when the active task needs detail.
 - `C016`: Agents must not game benchmark or report-quality evaluation by optimizing for fixture-specific artifacts, hidden answer cues, raw leaked text labels, or direct reuse of expected re
 - `C017`: Professional report acceptance requires a complete explicit or confirmed ResearchDesign. Shallow reports, unmapped objectives, missing assumptions, missing target population defini
 - `C018`: Professional proof artifacts must use the real report renderer path and may not substitute plaintext fallback PDFs. Report quality scoring must cap failed hard-gate results below t
+- `C019`: Professional golden-path proof must operationalize the public digital-persona survey research basis: distributional evaluation, segment/equity checks, multivariate-structure limita
 
 ## Current Accepted Direction
 
@@ -49,6 +50,7 @@ Synthetix is a self-hosted synthetic scenario-exploration and survey simulation 
 - `09-research-design-study-plan`: active and now executed through an intake-first vertical slice. `ResearchIntake` precedes `ResearchDesign` for document/questionnaire ingestion, 
 - `10-golden-path-intake-reset`: active; golden-path proof artifacts now use real renderer paths and fixture-backed intake proof instead of placeholder proof outputs.
 - `11-report-chart-quality-recovery`: active; professional report quality now requires honest renderer evidence, hard-gate-capped scores, and explicit chart-type decisions instead 
+- `12-research-basis-professional-report-recovery`: active; professional proof must now demonstrate alignment with the actual digital-persona survey research basis, reject toy prof
 ## Current Evaluation State
 - Development quality loop reached target in iteration 2 with average score `1.0` and minimum fixture score `1.0`.
 - Frozen validation cycle 001 failed and must not be tuned against as proof.
@@ -60,11 +62,12 @@ Synthetix is a self-hosted synthetic scenario-exploration and survey simulation 
 2. Continue rich reporting only after the intake-first contract is used by the shipped examples and objective-coverage/report-depth outputs remain strong under those fixtures.
 3. Keep production or structured PDF proof honest and prevent fallback plaintext artifacts from passing as professional output.
 4. Expand chart selection beyond bar-only defaults and preserve evidence-panel suppression for qualitative questions.
-5. Author and review locked holdout target JSON fixtures with source PDF hash validation.
-6. Run holdout actual-vs-predicted only after the target fixtures are locked.
-7. Keep all benchmark and report changes inside the scientific boundary.
-8. Harden the SDLC governor by running live Promptfoo gates once provider credentials are configured.
-9. Use Gryph evidence during future Codex/Claude Code sessions to generate dynamic context and review agent actions.
+5. Enforce digital-persona research-basis alignment before treating selected metric pass rate or professional report output as product-quality evidence.
+6. Author and review locked holdout target JSON fixtures with source PDF hash validation.
+7. Run holdout actual-vs-predicted only after the target fixtures are locked.
+8. Keep all benchmark and report changes inside the scientific boundary.
+9. Harden the SDLC governor by running live Promptfoo gates once provider credentials are configured.
+10. Use Gryph evidence during future Codex/Claude Code sessions to generate dynamic context and review agent actions.
 ## Non-Goals
 - Do not claim synthetic responses are representative human survey results.
 - Do not infer prevalence, statistical significance, confidence intervals, or causality.
@@ -75,13 +78,11 @@ Synthetix is a self-hosted synthetic scenario-exploration and survey simulation 
 ## Required Checks For Future Implementation
 - `uv run pytest`
 - targeted unit tests for changed modules
-- benchmark comparison commands for benchmark changes
-- frozen validation/holdout commands only when the active task permits those paths
 
 ## Current Dynamic State
 
 # Dynamic Context
-Generated at: 2026-06-21T19:07:39.596677+00:00
+Generated at: 2026-06-23T13:18:02.527625+00:00
 Current phase: implementation
 Active feature: existing-project-sdlc-baseline
 Implementation allowed: True

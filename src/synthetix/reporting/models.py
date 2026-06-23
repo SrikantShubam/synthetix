@@ -17,10 +17,13 @@ class AnalyticsChart(BaseModel):
     chart_id: str
     title: str
     chart_family: str
-    visual_type: Literal["bar", "horizontal_bar", "likert_stacked", "donut"] = "bar"
+    visual_type: Literal["bar", "horizontal_bar", "likert_stacked", "donut", "heatmap"] = "bar"
     labels: list[str] = Field(default_factory=list)
     values: list[int] = Field(default_factory=list)
     full_labels: list[str] = Field(default_factory=list)
+    row_labels: list[str] = Field(default_factory=list)
+    column_labels: list[str] = Field(default_factory=list)
+    matrix: list[list[int]] = Field(default_factory=list)
     denominator: int = 0
     option: dict[str, Any] = Field(default_factory=dict)
 
@@ -29,11 +32,14 @@ class ChartDecision(BaseModel):
     question_id: str | None = None
     status: Literal["rendered", "suppressed", "replaced_with_table", "replaced_with_evidence_panel"]
     reason: str
+    visual_type: Literal["bar", "horizontal_bar", "likert_stacked", "donut", "heatmap"] | None = None
+    replacement_type: Literal["table", "evidence_panel"] | None = None
 
 
 class ReportAnalytics(BaseModel):
     contract_version: str = "1.0"
     population_charts: list[AnalyticsChart] = Field(default_factory=list)
+    segment_comparison_charts: list[AnalyticsChart] = Field(default_factory=list)
 
 
 class DenominatorSummary(BaseModel):
@@ -256,9 +262,15 @@ class ReportModel(BaseModel):
                     "likert_summaries": [],
                     "rankings": [],
                     "theme_coding": [],
-                    "sensitivity_checks": ["Review failed attempts."],
+                    "sensitivity_checks": [
+                        "Review failed attempts.",
+                        "Check segment and equity patterns without inferring subgroup prevalence.",
+                        "State that multivariate clustering structure is not recovered by this dry run.",
+                        "State that source context and retrieval limits affect persona alignment.",
+                        "Use human validation and human fieldwork before decisions.",
+                    ],
                     "benchmark_checks": [
-                        "Benchmark comparisons, when present, use selected metric pass rate wording only."
+                        "Benchmark comparisons, when present, use selected metric pass rate and distributional evaluation wording only."
                     ],
                 },
                 qualitative_coding_plan={
@@ -306,6 +318,11 @@ class ReportModel(BaseModel):
                 quality_controls=[
                     "Question distributions include explicit denominators.",
                     "Failures remain represented in attrition accounting.",
+                    "Distributional evaluation is treated as stronger evidence than individual prediction.",
+                    "Segment and equity checks are exploratory only.",
+                    "Multivariate clustering and joint respondent structure are not claimed.",
+                    "Source context and retrieval limits are disclosed.",
+                    "Human validation and human fieldwork remain required.",
                 ],
             ),
             analytics=ReportAnalytics(

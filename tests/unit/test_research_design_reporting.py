@@ -150,7 +150,90 @@ def test_professional_report_quality_requires_explicit_research_design_sections(
 
     assert quality.research_design_tier == "professional"
     assert len(quality.objective_coverage) == 2
+    assert all(item["decision_question"] for item in quality.objective_coverage)
     assert quality.benchmark_wording_texts
+
+
+def test_professional_objective_coverage_is_question_specific() -> None:
+    blueprint = _professional_blueprint()
+    manifest = RunManifest.create(
+        run_id="run-1",
+        blueprint=blueprint,
+        source_hashes={},
+        model_id="openai/test-model",
+        provider="openrouter",
+        parameters={},
+    )
+
+    report = build_report(blueprint, _run_result(), manifest)
+
+    coverage_by_objective = {
+        item.objective: item.covered_question_ids for item in report.objective_coverage
+    }
+    assert coverage_by_objective["Measure concept fit."] == ["q1"]
+    assert coverage_by_objective["Identify barrier themes."] == ["q2"]
+
+
+def test_professional_objective_coverage_prefers_role_specific_diagnostic_questions() -> None:
+    blueprint = _professional_blueprint().model_copy(
+        update={
+            "questions": [
+                ChoiceQuestion(
+                    id="q3",
+                    prompt="How often do you avoid speaking up or disclosing part of your identity because of the professional climate?",
+                    options=["Never", "Rarely", "Sometimes", "Often"],
+                ),
+                ChoiceQuestion(
+                    id="q4",
+                    prompt="How should regional patterns be reported when country-group bases are unstable?",
+                    options=["Chart every region", "Use suppressed tables", "Skip regional cut"],
+                ),
+                OpenTextQuestion(
+                    id="q5",
+                    prompt="What specific climate, discrimination, avoidance, or harassment pattern deserves the most attention before fieldwork?",
+                ),
+            ],
+            "research_design": _professional_blueprint().research_design.model_copy(
+                update={
+                    "research_objectives": ["Surface segment suppression rules before human fieldwork."],
+                    "decision_questions": ["Does the questionnaire separate climate and fieldwork issues cleanly?"],
+                    "question_role_map": {"q3": "diagnostic", "q4": "diagnostic", "q5": "qualitative_probe"},
+                }
+            ),
+        }
+    )
+    manifest = RunManifest.create(
+        run_id="run-1",
+        blueprint=blueprint,
+        source_hashes={},
+        model_id="openai/test-model",
+        provider="openrouter",
+        parameters={},
+    )
+    result = RunResult(
+        run_id="run-1",
+        status=RunStatus.COMPLETED,
+        respondents=[
+            RespondentResult(
+                persona_id=f"p{index}",
+                attributes={"region": "urban", "role": "operator"},
+                status=AttemptStatus.SUCCEEDED,
+                answers={
+                    "q3": "Sometimes",
+                    "q4": "Use suppressed tables",
+                    "q5": "Human validation should check fieldwork risk.",
+                },
+                attempts=[AttemptRecord(number=1, status=AttemptStatus.SUCCEEDED)],
+            )
+            for index in range(1, 35)
+        ],
+        started_at=datetime.now(timezone.utc),
+        completed_at=datetime.now(timezone.utc),
+    )
+
+    report = build_report(blueprint, result, manifest)
+
+    assert report.objective_coverage[0].covered_question_ids == ["q4"]
 
 
 def test_lightweight_report_cannot_pass_professional_quality_gate() -> None:

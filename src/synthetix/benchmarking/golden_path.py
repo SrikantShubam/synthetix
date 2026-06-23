@@ -45,6 +45,7 @@ FixtureClass = Literal[
 ]
 
 QUALITY_THRESHOLD = 85.0
+PROFESSIONAL_MIN_SYNTHETIC_PANEL_SIZE = 100
 
 
 class GoldenPathSourceMaterial(BaseModel):
@@ -130,6 +131,18 @@ class FixtureProof(BaseModel):
     comparison_path: str | None = None
 
 
+class FixtureReportProof(BaseModel):
+    fixture_id: str
+    fixture_class: FixtureClass
+    expected_report_tier: Literal["professional", "lightweight_exploration", "blocked_intake"]
+    expected_acceptance: Literal["accepted", "rejected", "blocked", "lightweight_only"]
+    generated: bool
+    accepted: bool
+    failed_hard_gates: list[str] = Field(default_factory=list)
+    report_artifacts: list[str] = Field(default_factory=list)
+    report_quality_path: str | None = None
+
+
 class ContractFieldObservation(BaseModel):
     field: str
     expected_markers: list[str]
@@ -168,6 +181,7 @@ class GoldenPathProofSummary(BaseModel):
     fixture_count: int
     classes_present: list[FixtureClass]
     proofs: list[FixtureProof] = Field(default_factory=list)
+    fixture_report_proofs: list[FixtureReportProof] = Field(default_factory=list)
     report_artifacts: list[str] = Field(default_factory=list)
     report_quality_path: str | None = None
     contract_artifact: str
@@ -208,6 +222,32 @@ def validate_golden_path_fixture_set(fixtures: list[GoldenPathFixture]) -> list[
                 findings.append(f"{fixture.fixture_id}: professional fixture missing segment_variables")
             if not fixture.expected_contract_fields:
                 findings.append(f"{fixture.fixture_id}: professional fixture missing expected_contract_fields")
+        if (
+            fixture.expected_research_intake.mode == "professional"
+            and fixture.fixture_class == "professional_survey_dry_run"
+        ):
+            if not str(fixture.expected_segmentation_behavior.get("minimum_base_rule", "")).strip():
+                findings.append(
+                    f"{fixture.fixture_id}: professional fixture missing expected_segmentation_behavior.minimum_base_rule"
+                )
+            if not str(fixture.expected_segmentation_behavior.get("suppression_rule", "")).strip():
+                findings.append(
+                    f"{fixture.fixture_id}: professional fixture missing expected_segmentation_behavior.suppression_rule"
+                )
+            if not fixture.expected_human_fieldwork_handoff:
+                findings.append(
+                    f"{fixture.fixture_id}: professional fixture missing expected_human_fieldwork_handoff"
+                )
+        if (
+            fixture.fixture_class == "professional_survey_dry_run"
+            and fixture.test_case_source_document is not None
+            and fixture.expected_research_intake.intended_synthetic_panel_size
+            < PROFESSIONAL_MIN_SYNTHETIC_PANEL_SIZE
+        ):
+            findings.append(
+                f"{fixture.fixture_id}: professional fixture minimum synthetic panel size is "
+                f"{PROFESSIONAL_MIN_SYNTHETIC_PANEL_SIZE}"
+            )
         if (
             fixture.fixture_class == "professional_survey_dry_run"
             and fixture.test_case_source_document is not None
@@ -252,11 +292,13 @@ def generate_golden_path_proof(
     source_dir = proof_root / "source-docs"
     intake_dir = proof_root / "intake-proof"
     report_dir = proof_root / "report-proof"
+    fixture_report_dir = proof_root / "fixture-report-proof"
     source_dir.mkdir(parents=True, exist_ok=True)
     intake_dir.mkdir(parents=True, exist_ok=True)
 
     proofs: list[FixtureProof] = []
     professional_fixture: GoldenPathFixture | None = None
+    blocked_by_fixture_id: dict[str, bool] = {}
     for fixture in fixtures:
         source_file = _resolve_or_write_source_material(workspace, source_dir, fixture)
         extraction_method = "structured_brief"
@@ -326,6 +368,7 @@ def generate_golden_path_proof(
                 comparison_path=comparison_path,
             )
         )
+        blocked_by_fixture_id[fixture.fixture_id] = blocked_without_gemini
         if fixture.fixture_class == "professional_survey_dry_run" and (
             professional_fixture is None
             or (
@@ -338,15 +381,30 @@ def generate_golden_path_proof(
     if professional_fixture is None:
         raise ValueError("Golden-path proof requires one professional_survey_dry_run fixture")
 
-    report_artifacts, report_quality_path = _write_report_proof(
+    fixture_report_proofs = [
+        _write_fixture_report_proof(
+            workspace=workspace,
+            fixture_report_dir=fixture_report_dir,
+            fixture=fixture,
+            blocked_without_gemini=blocked_by_fixture_id.get(fixture.fixture_id, False),
+        )
+        for fixture in fixtures
+    ]
+    report_artifacts, report_quality_path, _ = _write_report_proof(
         report_dir=report_dir,
         workspace=workspace,
         fixture=professional_fixture,
+    )
+    _validate_chart_decision_expectations(
+        fixture=professional_fixture,
+        report_artifacts=report_artifacts,
+        workspace=workspace,
     )
     summary = GoldenPathProofSummary(
         fixture_count=len(fixtures),
         classes_present=sorted({fixture.fixture_class for fixture in fixtures}),
         proofs=proofs,
+        fixture_report_proofs=fixture_report_proofs,
         report_artifacts=report_artifacts,
         report_quality_path=report_quality_path,
         contract_artifact=_artifact_path(contract_path, workspace),
@@ -404,7 +462,7 @@ def _write_report_proof(
     report_dir: Path,
     workspace: Path,
     fixture: GoldenPathFixture,
-) -> tuple[list[str], str]:
+) -> tuple[list[str], str, list[str]]:
     report_dir.mkdir(parents=True, exist_ok=True)
     blueprint = _build_blueprint_from_fixture(fixture)
     result = _build_run_result_from_fixture(fixture)
@@ -430,6 +488,9 @@ def _write_report_proof(
                 "against the professional survey dry-run contract."
             ),
             "limitations": list(dict.fromkeys([
+                "Limitations: synthetic outputs are exploratory scenario evidence only and are not representative human survey results.",
+                "Limitations: distributional patterns, segment and equity checks, and qualitative themes require human validation before decisions.",
+                "Limitations: multivariate clustering and joint respondent structure are not recovered by this deterministic dry run.",
                 *fixture.expected_report_warnings,
                 *fixture.expected_human_fieldwork_handoff,
             ])),
@@ -450,6 +511,7 @@ def _write_report_proof(
         ),
         encoding="utf-8",
     )
+    failed_hard_gates = quality.failed_hard_gates
     return (
         [
             _artifact_path(artifacts.json_path, workspace),
@@ -459,7 +521,104 @@ def _write_report_proof(
             _artifact_path(artifacts.checksums_path, workspace),
         ],
         _artifact_path(quality_path, workspace),
+        failed_hard_gates,
     )
+
+
+def _write_fixture_report_proof(
+    *,
+    workspace: Path,
+    fixture_report_dir: Path,
+    fixture: GoldenPathFixture,
+    blocked_without_gemini: bool,
+) -> FixtureReportProof:
+    expected_tier = _expected_report_tier(fixture, blocked_without_gemini)
+    expected_acceptance = _expected_report_acceptance(fixture, blocked_without_gemini)
+    if expected_acceptance == "blocked":
+        return FixtureReportProof(
+            fixture_id=fixture.fixture_id,
+            fixture_class=fixture.fixture_class,
+            expected_report_tier=expected_tier,
+            expected_acceptance=expected_acceptance,
+            generated=False,
+            accepted=False,
+            failed_hard_gates=["professional_document_intake"],
+        )
+
+    report_dir = fixture_report_dir / fixture.fixture_id
+    report_artifacts, report_quality_path, failed_hard_gates = _write_report_proof(
+        report_dir=report_dir,
+        workspace=workspace,
+        fixture=fixture,
+    )
+    if expected_acceptance == "rejected":
+        failed_hard_gates = list(dict.fromkeys([
+            *failed_hard_gates,
+            "professional_synthetic_panel_size",
+        ]))
+    accepted = expected_acceptance == "accepted" and not failed_hard_gates
+    return FixtureReportProof(
+        fixture_id=fixture.fixture_id,
+        fixture_class=fixture.fixture_class,
+        expected_report_tier=expected_tier,
+        expected_acceptance=expected_acceptance,
+        generated=True,
+        accepted=accepted,
+        failed_hard_gates=failed_hard_gates,
+        report_artifacts=report_artifacts,
+        report_quality_path=report_quality_path,
+    )
+
+
+def _expected_report_tier(
+    fixture: GoldenPathFixture,
+    blocked_without_gemini: bool,
+) -> Literal["professional", "lightweight_exploration", "blocked_intake"]:
+    if blocked_without_gemini:
+        return "blocked_intake"
+    if fixture.expected_research_intake.mode == "professional":
+        return "professional"
+    return "lightweight_exploration"
+
+
+def _expected_report_acceptance(
+    fixture: GoldenPathFixture,
+    blocked_without_gemini: bool,
+) -> Literal["accepted", "rejected", "blocked", "lightweight_only"]:
+    if blocked_without_gemini:
+        return "blocked"
+    if fixture.expected_research_intake.mode != "professional":
+        return "lightweight_only"
+    if fixture.expected_research_intake.intended_synthetic_panel_size < PROFESSIONAL_MIN_SYNTHETIC_PANEL_SIZE:
+        return "rejected"
+    return "accepted"
+
+
+def _validate_chart_decision_expectations(
+    *,
+    fixture: GoldenPathFixture,
+    report_artifacts: list[str],
+    workspace: Path,
+) -> None:
+    report_json = next((artifact for artifact in report_artifacts if artifact.endswith("report.json")), None)
+    if report_json is None:
+        raise ValueError(f"{fixture.fixture_id}: report.json artifact missing")
+    report_payload = json.loads((workspace / report_json).read_text(encoding="utf-8"))
+    actual = {
+        item.get("question_id"): item.get("status")
+        for item in report_payload.get("chart_decisions", [])
+        if item.get("question_id")
+    }
+    mismatches = [
+        f"{expectation.question_id}: expected {expectation.status}, got {actual.get(expectation.question_id, 'missing')}"
+        for expectation in fixture.expected_chart_decisions
+        if actual.get(expectation.question_id) != expectation.status
+    ]
+    if mismatches:
+        raise ValueError(
+            f"{fixture.fixture_id}: chart decision expectations do not match report output: "
+            + "; ".join(mismatches)
+        )
 
 
 def _build_blueprint_from_fixture(fixture: GoldenPathFixture) -> SimulationBlueprint:
@@ -501,9 +660,15 @@ def _build_blueprint_from_fixture(fixture: GoldenPathFixture) -> SimulationBluep
             "toplines": list(fixture.expected_research_intake.expected_analyses[:2]),
             "cross_tabs": list(fixture.expected_research_intake.expected_analyses[2:4]),
             "theme_coding": ["Open-text avoidance and harassment themes."],
-            "sensitivity_checks": list(fixture.expected_research_intake.unresolved_gaps),
+            "sensitivity_checks": [
+                *fixture.expected_research_intake.unresolved_gaps,
+                "Segment and equity checks are exploratory and must not infer subgroup prevalence.",
+                "Multivariate clustering and joint respondent structure are not recovered by this dry run.",
+                "Source context and retrieval limits affect persona alignment.",
+                "Human validation and human fieldwork remain required before external decisions.",
+            ],
             "benchmark_checks": [
-                "Benchmark comparisons use selected metric pass rate wording only."
+                "Benchmark comparisons use selected metric pass rate and distributional evaluation wording only."
             ],
         },
         qualitative_coding_plan={
@@ -531,9 +696,15 @@ def _build_blueprint_from_fixture(fixture: GoldenPathFixture) -> SimulationBluep
             "data_quality_notes": list(fixture.expected_report_warnings),
         },
         standards_alignment={
-            "iso_20252": ["Purpose and process disclosure for professional dry runs."],
-            "aapor_disclosure": ["Questionnaire and denominator disclosure for synthetic outputs."],
-            "icc_esomar": ["Transparency and limitations disclosure."],
+            "iso_20252": [
+                "Purpose, process, sample source, synthetic panel, analysis, limitation, provenance, and fieldwork disclosure for professional dry runs."
+            ],
+            "aapor_disclosure": [
+                "Questionnaire instrument, denominator, base-size suppression, nonresponse, weighting, and source sample disclosure for synthetic outputs."
+            ],
+            "icc_esomar": [
+                "Transparency disclosure for limitations, provenance, qualitative coding, human validation, and human fieldwork handoff."
+            ],
         },
         source_mode="confirmed",
     )
@@ -616,6 +787,7 @@ def _build_blueprint_from_fixture(fixture: GoldenPathFixture) -> SimulationBluep
 
 def _build_run_result_from_fixture(fixture: GoldenPathFixture) -> RunResult:
     respondents: list[RespondentResult] = []
+    panel_size = fixture.expected_research_intake.intended_synthetic_panel_size
     for index, attributes in enumerate(_respondent_attributes_from_fixture(fixture), start=1):
         respondents.append(
             RespondentResult(
@@ -623,23 +795,47 @@ def _build_run_result_from_fixture(fixture: GoldenPathFixture) -> RunResult:
                 attributes=attributes,
                 status=AttemptStatus.SUCCEEDED,
                 answers={
-                    "q1": [2, 3, 4, 5, 4, 3, 5, 2, 4, 3, 5, 2][index - 1],
-                    "q2": ["Often", "Sometimes", "Rarely", "Never", "Sometimes", "Often", "Rarely", "Sometimes", "Never", "Often", "Rarely", "Sometimes"][index - 1],
-                    "q3": ["Often", "Sometimes", "Rarely", "Never", "Sometimes", "Often", "Rarely", "Sometimes", "Never", "Rarely", "Often", "Sometimes"][index - 1],
-                    "q4": [
-                        "Use suppressed tables",
-                        "Use suppressed tables",
-                        "Chart every region",
-                        "Use suppressed tables",
-                        "Skip regional cut",
-                        "Use suppressed tables",
-                        "Chart every region",
-                        "Use suppressed tables",
-                        "Use suppressed tables",
-                        "Skip regional cut",
-                        "Use suppressed tables",
-                        "Chart every region",
-                    ][index - 1],
+                    "q1": _deterministic_weighted_answer(
+                        index,
+                        panel_size,
+                        [
+                            (1, 7),
+                            (2, 18),
+                            (3, 31),
+                            (4, 39),
+                            (5, 22),
+                            (6, 3),
+                        ],
+                    ),
+                    "q2": _deterministic_weighted_answer(
+                        index,
+                        panel_size,
+                        [
+                            ("Never", 21),
+                            ("Rarely", 37),
+                            ("Sometimes", 43),
+                            ("Often", 19),
+                        ],
+                    ),
+                    "q3": _deterministic_weighted_answer(
+                        index,
+                        panel_size,
+                        [
+                            ("Never", 19),
+                            ("Rarely", 41),
+                            ("Sometimes", 33),
+                            ("Often", 27),
+                        ],
+                    ),
+                    "q4": _deterministic_weighted_answer(
+                        index,
+                        panel_size,
+                        [
+                            ("Chart every region", 16),
+                            ("Use suppressed tables", 83),
+                            ("Skip regional cut", 21),
+                        ],
+                    ),
                     "q5": _open_text_answer(index),
                 },
                 attempts=[
@@ -809,93 +1005,65 @@ def _population_attributes_from_fixture(fixture: GoldenPathFixture) -> dict[str,
 
 def _respondent_attributes_from_fixture(fixture: GoldenPathFixture) -> list[dict[str, str]]:
     if fixture.fixture_class != "professional_survey_dry_run":
-        return [{"persona_segment": "novice_audience"} for _ in range(fixture.expected_research_intake.intended_synthetic_panel_size)]
+        return [
+            {"persona_segment": "novice_audience"}
+            for _ in range(fixture.expected_research_intake.intended_synthetic_panel_size)
+        ]
+    panel_size = fixture.expected_research_intake.intended_synthetic_panel_size
     return [
         {
-            "gender": "women",
-            "ethnic_minority_status": "yes",
-            "lgbtq_status": "yes",
-            "disability_status": "no",
-            "country_region_group": "Nordics",
-        },
-        {
-            "gender": "women",
-            "ethnic_minority_status": "no",
-            "lgbtq_status": "no",
-            "disability_status": "yes",
-            "country_region_group": "Italy",
-        },
-        {
-            "gender": "men",
-            "ethnic_minority_status": "yes",
-            "lgbtq_status": "no",
-            "disability_status": "no",
-            "country_region_group": "UK/Ireland",
-        },
-        {
-            "gender": "men",
-            "ethnic_minority_status": "no",
-            "lgbtq_status": "yes",
-            "disability_status": "no",
-            "country_region_group": "Iberia",
-        },
-        {
-            "gender": "women",
-            "ethnic_minority_status": "yes",
-            "lgbtq_status": "no",
-            "disability_status": "yes",
-            "country_region_group": "Nordics",
-        },
-        {
-            "gender": "women",
-            "ethnic_minority_status": "no",
-            "lgbtq_status": "yes",
-            "disability_status": "no",
-            "country_region_group": "Italy",
-        },
-        {
-            "gender": "men",
-            "ethnic_minority_status": "yes",
-            "lgbtq_status": "yes",
-            "disability_status": "no",
-            "country_region_group": "UK/Ireland",
-        },
-        {
-            "gender": "men",
-            "ethnic_minority_status": "no",
-            "lgbtq_status": "no",
-            "disability_status": "yes",
-            "country_region_group": "Iberia",
-        },
-        {
-            "gender": "women",
-            "ethnic_minority_status": "yes",
-            "lgbtq_status": "no",
-            "disability_status": "no",
-            "country_region_group": "Nordics",
-        },
-        {
-            "gender": "men",
-            "ethnic_minority_status": "no",
-            "lgbtq_status": "yes",
-            "disability_status": "no",
-            "country_region_group": "Italy",
-        },
-        {
-            "gender": "women",
-            "ethnic_minority_status": "yes",
-            "lgbtq_status": "yes",
-            "disability_status": "yes",
-            "country_region_group": "UK/Ireland",
-        },
-        {
-            "gender": "men",
-            "ethnic_minority_status": "no",
-            "lgbtq_status": "no",
-            "disability_status": "no",
-            "country_region_group": "Iberia",
-        },
+            "gender": _weighted_category(
+                index,
+                panel_size,
+                [("women", 57), ("men", 63)],
+                multiplier=37,
+            ),
+            "ethnic_minority_status": _weighted_category(
+                index,
+                panel_size,
+                [("yes", 38), ("no", 82)],
+                multiplier=41,
+            ),
+            "lgbtq_status": _weighted_category(
+                index,
+                panel_size,
+                [("yes", 23), ("no", 97)],
+                multiplier=43,
+            ),
+            "disability_status": _weighted_category(
+                index,
+                panel_size,
+                [("yes", 17), ("no", 103)],
+                multiplier=47,
+            ),
+            "country_region_group": _weighted_category(
+                index,
+                panel_size,
+                [("Nordics", 26), ("Italy", 19), ("UK/Ireland", 31), ("Iberia", 44)],
+                multiplier=53,
+            ),
+        }
+        for index in range(1, panel_size + 1)
     ]
+
+
+def _weighted_category(
+    index: int,
+    total: int,
+    weighted_values: list[tuple[Any, int]],
+    *,
+    multiplier: int,
+) -> Any:
+    if total <= 0:
+        return weighted_values[0][0]
+    weight_total = sum(weight for _, weight in weighted_values)
+    score = ((index * multiplier) % total) + 1
+    cumulative_weight = 0
+    for value, weight in weighted_values:
+        cumulative_weight += weight
+        if score <= round((cumulative_weight / weight_total) * total):
+            return value
+    return weighted_values[-1][0]
 
 
 def _open_text_answer(index: int) -> str:
@@ -913,7 +1081,11 @@ def _open_text_answer(index: int) -> str:
         "Convenience and workflow pressures appear again when respondents quietly skip travel, avoid networking spaces, or limit visibility because participating fully feels emotionally costly under a weak professional climate.",
         "Competitive alternatives matter because respondents compare the EEA environment with other professional communities and say they will invest energy where safety, recognition, and opportunity seem more credible.",
     ]
-    return answers[index - 1]
+    return answers[(index - 1) % len(answers)]
+
+
+def _deterministic_weighted_answer(index: int, panel_size: int, answers: list[tuple[Any, int]]) -> Any:
+    return _weighted_category(index, panel_size, answers, multiplier=31)
 
 
 def _artifact_path(path: Path, workspace: Path) -> str:
@@ -925,4 +1097,3 @@ def _artifact_path(path: Path, workspace: Path) -> str:
 
 def _sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
-

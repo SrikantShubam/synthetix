@@ -259,6 +259,23 @@ def test_golden_path_review_passes_with_expanded_fixture_set(tmp_path: Path) -> 
     }
 
 
+def test_golden_path_review_requires_fixture_level_report_proofs(tmp_path: Path) -> None:
+    generate_golden_path_proof(Path.cwd(), output_dir=tmp_path / "golden-path")
+    proof_path = tmp_path / "golden-path" / "intake-proof" / "proof-summary.json"
+    payload = json.loads(proof_path.read_text(encoding="utf-8"))
+    payload["fixture_report_proofs"] = []
+    proof_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+
+    review = review_golden_path_workspace(
+        Path.cwd(),
+        proof_path=proof_path,
+        output_path=tmp_path / "golden-path" / "review-latest.json",
+    )
+
+    assert review.passed is False
+    assert any(finding.code == "missing_fixture_report_proof" for finding in review.findings)
+
+
 def test_orchestrator_rejects_holdout_paths_except_holdout_readiness() -> None:
     task = OrchestratorTask(
         spec_id="02-pipeline-predicted-metrics",

@@ -78,9 +78,9 @@
     "source_type": "pdf_brief",
     "research_context": "EEA professional climate survey of current and former members, with Europe-wide regional comparisons and AEA 2018 context.",
     "target_population_summary": "Current and former EEA members and related economics professionals across Europe.",
-    "target_population_size": 861,
+    "target_population_size": null,
     "source_sample_size": 861,
-    "intended_synthetic_panel_size": 12,
+    "intended_synthetic_panel_size": 861,
     "segment_variables": [
       "gender",
       "ethnic minority status",
@@ -161,9 +161,8 @@
     }
   ],
   "expected_synthetic_panel_limits": {
-    "target_population_size": 861,
     "source_sample_size": 861,
-    "intended_synthetic_panel_size": 12,
+    "intended_synthetic_panel_size": 861,
     "require_separate_reporting": true
   },
   "expected_segmentation_behavior": {
@@ -190,8 +189,8 @@
     },
     {
       "question_id": "q3",
-      "status": "replaced_with_evidence_panel",
-      "reason_contains": "coded themes and traceable quotes"
+      "status": "rendered",
+      "reason_contains": "closed-ended avoidance block"
     },
     {
       "question_id": "q4",

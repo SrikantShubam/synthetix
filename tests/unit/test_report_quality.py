@@ -18,7 +18,7 @@ from synthetix.reporting.quality import (
     build_quality_input,
     load_benchmark_registry,
 )
-from synthetix.reporting.models import ReportModel
+from synthetix.reporting.models import AnalyticsChart, QuoteEvidence, ReportAnalytics, ReportModel
 from synthetix.reporting.models import Distribution, SegmentCut, ThemeEvidence
 from synthetix.reporting.renderer import ReportArtifacts
 
@@ -102,10 +102,36 @@ def valid_quality_input() -> ReportQualityInput:
         segmentation_plan_summary="region; age_group; suppress small cells",
         analysis_plan_summary="topline; crosstab; theme coding",
         qualitative_coding_summary="deterministic; barrier themes; minimum themes=2",
+        sample_source_summary="Sample source: declared personas drawn from the target population.",
+        synthetic_panel_summary="Synthetic panel size 120 built from the declared attribute grid.",
+        synthetic_panel_size=120,
+        questionnaire_instrument_summary="Questionnaire instrument uses a structured concept-fit prompt and barrier probe.",
+        nonresponse_weighting_summary="No weighting applied; refusals remain in attrition accounting.",
+        limitations_texts=[
+            "Synthetic scenario evidence only.",
+            "Do not infer prevalence, causality, or statistical significance from this report.",
+        ],
+        provenance_texts=[
+            "Model openai/test-model",
+            "Provider openrouter",
+            "Protocol version 1.0",
+            "Blueprint and manifest hashes are recorded.",
+        ],
+        fieldwork_handoff_texts=[
+            "Use this dry run to refine wording and hand off to human fieldwork.",
+            "Do not treat synthetic personas as representative of the target population.",
+        ],
         standards_alignment_texts=[
-            "Purpose and process disclosure.",
-            "Questionnaire and denominator disclosure.",
-            "Transparency disclosure.",
+            "Purpose and process disclosure for sample source, questionnaire, and fieldwork handoff.",
+            "Questionnaire and denominator disclosure for base-size suppression and weighting notes.",
+            "Transparency disclosure for provenance and limitations.",
+        ],
+        research_basis_alignment_texts=[
+            "Distributional evaluation is reported through selected metric pass rate wording.",
+            "Segment and equity checks are exploratory and non-inferential.",
+            "Multivariate clustering and joint respondent structure are not claimed.",
+            "Source context and retrieval limits are disclosed.",
+            "Human validation and human fieldwork remain required.",
         ],
         benchmark_wording_texts=[
             "Benchmark comparisons use selected metric pass rate wording only."
@@ -119,6 +145,7 @@ def valid_quality_input() -> ReportQualityInput:
                 "question_id": "q1",
                 "status": "rendered",
                 "reason": "Closed-ended distribution has a stable base and chart-safe categorical labels.",
+                "visual_type": "bar",
             }
         ],
         pdf_rendering_mode="weasyprint",
@@ -239,6 +266,71 @@ def test_hard_gates_override_high_score() -> None:
     }
 
 
+def test_professional_objective_coverage_requires_decision_question() -> None:
+    quality_input = valid_quality_input().model_copy(
+        update={
+            "objective_coverage": [
+                {
+                    "objective": "Preserve comparison context without overclaiming.",
+                    "decision_question": None,
+                    "covered_question_ids": ["q1", "q2"],
+                    "status": "covered",
+                    "notes": "Questions are present but no decision question is mapped.",
+                }
+            ]
+        }
+    )
+
+    result = ReportQualityScorer().evaluate(quality_input)
+
+    assert result.accepted is False
+    assert "research_objectives_covered" in result.failed_hard_gates
+
+
+def test_professional_chart_decisions_require_visual_and_replacement_types() -> None:
+    broken = valid_quality_input().model_copy(
+        update={
+            "chart_decisions": [
+                {
+                    "question_id": "q1",
+                    "status": "rendered",
+                    "reason": "Closed-ended distribution has a stable base and chart-safe categorical labels.",
+                },
+                {
+                    "question_id": "q2",
+                    "status": "replaced_with_evidence_panel",
+                    "reason": "Open-text evidence is better shown through coded themes and quotes than a raw chart.",
+                },
+                {
+                    "question_id": "q3",
+                    "status": "suppressed",
+                    "reason": "Question base is too small for a stable chart.",
+                },
+            ]
+        }
+    )
+
+    result = ReportQualityScorer().evaluate(broken)
+
+    assert result.accepted is False
+    assert "chart_decision_missing_visual_type" in result.failed_hard_gates
+    assert "chart_decision_missing_replacement_type" in result.failed_hard_gates
+
+
+def test_professional_quality_rejects_toy_synthetic_panel_size() -> None:
+    broken = valid_quality_input().model_copy(
+        update={
+            "synthetic_panel_size": 12,
+            "synthetic_panel_summary": "Synthetic panel size 12 built from the declared attribute grid.",
+        }
+    )
+
+    result = ReportQualityScorer().evaluate(broken)
+
+    assert result.accepted is False
+    assert "professional_synthetic_panel_size" in result.failed_hard_gates
+
+
 def test_missing_checksum_artifacts_fail_hard_gate() -> None:
     broken = valid_quality_input().model_copy(update={"artifact_checksums": []})
 
@@ -320,6 +412,70 @@ def test_build_quality_input_derives_real_gate_inputs(tmp_path: Path) -> None:
     assert quality_input.research_design_tier == "professional"
     assert quality_input.report_warnings
     assert quality_input.chart_decisions
+
+
+def test_build_quality_input_caps_traceable_quote_count_to_rendered_evidence(tmp_path: Path) -> None:
+    report = ReportModel.example()
+    question = report.questions[0].model_copy(
+        update={
+            "themes": [
+                ThemeEvidence(
+                    theme_id="q1:theme:price",
+                    label="Price concern",
+                    count=60,
+                    supporting_quote_ids=[f"q1:p{index}" for index in range(1, 61)],
+                )
+            ],
+            "segment_cuts": [
+                SegmentCut(
+                    attribute="region",
+                    value=f"segment-{index}",
+                    base_count=10,
+                    themes=[
+                        ThemeEvidence(
+                            theme_id=f"q1:segment:{index}:theme:price",
+                            label="Price concern",
+                            count=10,
+                            supporting_quote_ids=[f"q1:p{quote}" for quote in range(1, 11)],
+                        )
+                    ],
+                )
+                for index in range(1, 6)
+            ],
+            "quote_evidence": [
+                QuoteEvidence(
+                    quote_id=f"q1:p{index}",
+                    persona_id=f"p{index}",
+                    text=f"Evidence row {index}.",
+                    attributes={"region": "urban"},
+                )
+                for index in range(1, 61)
+            ]
+        }
+    )
+    report = report.model_copy(update={"questions": [question]})
+    json_path = tmp_path / "report.json"
+    html_path = tmp_path / "report.html"
+    pdf_path = tmp_path / "report.pdf"
+    checksums_path = tmp_path / "checksums.json"
+    json_path.write_text("{}", encoding="utf-8")
+    html_path.write_text("<html><body>bounded quote evidence</body></html>", encoding="utf-8")
+    pdf = canvas.Canvas(str(pdf_path), pagesize=A4, pageCompression=1, invariant=1)
+    pdf.drawString(48, A4[1] - 48, "bounded quote evidence")
+    pdf.save()
+    checksums_path.write_text("{}", encoding="utf-8")
+    artifacts = ReportArtifacts(
+        json_path=json_path,
+        html_path=html_path,
+        pdf_path=pdf_path,
+        checksums_path=checksums_path,
+        chart_paths=[],
+    )
+
+    quality_input = build_quality_input(report, artifacts)
+
+    assert quality_input.report_depth.traceable_quote_count == 20
+    assert quality_input.report_depth.qualitative_theme_count == 1
 
 
 def test_build_quality_input_sanitizes_narrative_chart_labels(tmp_path: Path) -> None:
@@ -440,6 +596,40 @@ def test_build_quality_input_flags_escaped_html_entities_in_rendered_text(tmp_pa
     assert "rendered_text_has_no_html_artifacts" in score.failed_hard_gates
 
 
+def test_generic_standards_alignment_texts_are_insufficient_for_professional_quality() -> None:
+    broken = valid_quality_input().model_copy(
+        update={
+            "standards_alignment_texts": ["Purpose and process disclosure."],
+        }
+    )
+
+    result = ReportQualityScorer().evaluate(broken)
+
+    assert result.accepted is False
+    assert "standards_alignment_disclosure_complete" in result.failed_hard_gates
+
+
+def test_professional_standards_alignment_requires_substantive_disclosure_topics() -> None:
+    broken = valid_quality_input().model_copy(
+        update={
+            "target_population_summary": "Declared personas.",
+            "sampling_frame_summary": "Declared attribute grid.",
+            "segmentation_plan_summary": "Region cuts.",
+            "analysis_plan_summary": "Analysis.",
+            "qualitative_coding_summary": "Coding.",
+            "standards_alignment_texts": [
+                "Questionnaire disclosure.",
+                "Transparency disclosure.",
+            ],
+        }
+    )
+
+    result = ReportQualityScorer().evaluate(broken)
+
+    assert result.accepted is False
+    assert "standards_alignment_disclosure_complete" in result.failed_hard_gates
+
+
 def test_rendered_html_entity_artifacts_fail_quality_gate() -> None:
     broken = valid_quality_input().model_copy(
         update={"rendered_text_artifacts": ["pdf_contains_visible_html_entities"]}
@@ -531,6 +721,49 @@ def test_build_quality_input_counts_segment_level_qualitative_themes(tmp_path: P
 
     assert input_model.report_depth.qualitative_theme_count == 2
     assert input_model.report_depth.traceable_quote_count >= 3
+
+
+def test_build_quality_input_counts_only_rendered_chart_artifacts(tmp_path: Path) -> None:
+    report = ReportModel.example().model_copy(
+        update={
+            "analytics": ReportAnalytics(
+                population_charts=[
+                    AnalyticsChart(
+                        chart_id="population:region",
+                        title="Region composition",
+                        chart_family="population_segment",
+                        visual_type="donut",
+                        labels=["urban", "rural"],
+                        values=[1, 1],
+                        denominator=2,
+                    )
+                ]
+            )
+        }
+    )
+    (tmp_path / "report.json").write_text("{}", encoding="utf-8")
+    (tmp_path / "report.html").write_text(
+        "<html><body>Non-inferential synthetic evidence only.</body></html>",
+        encoding="utf-8",
+    )
+    (tmp_path / "report.pdf").write_bytes(b"%PDF-1.4\n")
+    (tmp_path / "checksums.json").write_text(
+        '{"report.json":"44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a","report.html":"","report.pdf":""}',
+        encoding="utf-8",
+    )
+
+    input_model = build_quality_input(
+        report,
+        ReportArtifacts(
+            json_path=tmp_path / "report.json",
+            html_path=tmp_path / "report.html",
+            pdf_path=tmp_path / "report.pdf",
+            checksums_path=tmp_path / "checksums.json",
+            chart_paths=[],
+        ),
+    )
+
+    assert input_model.report_depth.chart_count == 0
 
 
 def test_benchmark_registry_metadata_is_authoritative_without_restricted_downloads() -> None:
